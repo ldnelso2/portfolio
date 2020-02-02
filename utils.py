@@ -1,3 +1,13 @@
+from collections import namedtuple
+
+
+# Simple named tuple to organize the index of a cell, and if it is required or not
+#
+# Parsing immediately, and with intent of what must be there prevents
+# a slew of boundary type errors or runtime ones.
+Cell = namedtuple('Cell', ['index', 'name', 'required'])
+
+
 class SmartsheetRow():
     """Reusable Smartsheet class for parsing a row. To use, define a child class which contains
     class attributes with a namedtuple defining each cell that should be parsed. This child class will
@@ -38,13 +48,15 @@ class SmartsheetRow():
     def to_json(self):
         cell_defs = [getattr(self, attr) for attr in dir(self) if 'CELL_' in attr]
         return { cd.name: getattr(self, cd.name) for cd in cell_defs}
-    
+
+
 def _clamp(val, minimum=0, maximum=255):
     if val < minimum:
         return int(minimum)
     if val > maximum:
         return int(maximum)
     return int(val)
+
 
 def colorscale(hexstr, scalefactor):
     """
