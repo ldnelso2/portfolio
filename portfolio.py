@@ -5,6 +5,36 @@ import math
 from utils import Cell, SmartsheetRow
 
 class CashFlow():
+    """Generate a cash flow profile based on key assumptions
+    
+    Args:
+        delay_qtrs (int): Delay until cash flow starts to take effect
+        discount_rate (float): Discount rate used in discounted cash
+            flow calculations
+        is_cost (boolean): Whether cash flow profile is a cost or not
+        max_amt (float): Unitless amount that profile can scale up to
+        scale_up_qtrs (int): How many quarters it takes to scale up a cash
+            flow.
+        function (string): Profile type of cash flow
+    
+    Keyword arguments:
+        name (string): Descriptive name of the cash flow (default '')
+        discounted (boolean): Whether or not `.qtr` will return a discounted
+            profile (default: True).
+        flow_id (UUID): A unique identifier for the cash flow. This is only
+            important deletes become a thing (default UUID).
+        tot_qtrs (int): Total number of quarters the profile will run over.
+            Essentially dictates the length of the resulting data output
+            (default 12).
+
+    Returns:
+        CashFlow instance
+        
+    TODO:
+        * `discount_rate` should not be required if `discounted` is `False`
+        * args/kwargs should be validated
+        * function profile types should be class attributes, e.g. CashFlow.SIGMOIDs
+    """
     def __init__(self, delay_qtrs, discount_rate, is_cost, max_amt, scale_up_qtrs,
                  function, name='', discounted=True, flow_id=uuid.uuid4(), tot_qtrs=12):
         if scale_up_qtrs < 2: 
@@ -85,18 +115,22 @@ class CashFlow():
     
     @property
     def sigmoid_qtr(self):
+        """returns cash flow profile with a sigmoid profile, ignoring "function" attribute"""
         return self._calculate_qtr(self._sigmoid)
     
     @property
     def linear_qtr(self):
+        """returns cash flow profile with a linear profile, ignoring "function" attribute"""
         return self._calculate_qtr(self._linear)
     
     @property
     def step_qtr(self):
+        """returns cash flow profile with a step profile, ignoring "function" attribute"""
         return self._calculate_qtr(self._step)
     
     @property
     def single_qtr(self):
+        """returns cash flow profile with a one-time amounts, ignoring "function" attribute"""
         return self._calculate_qtr(self._single)
     
     def to_json(self):
