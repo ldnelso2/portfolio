@@ -79,7 +79,7 @@ class CashFlow():
     def _step(self, x):
         return self.max_amt
  
-    def _discounted_cash_flow(self, f):
+    def _discounted(self, f):
         @wraps(f)
         def discounted_wrapper(quarter_n):
             return f(quarter_n) / (1 + self.discount_rate) ** quarter_n
@@ -88,7 +88,7 @@ class CashFlow():
     
     def _calculate_qtr(self, f):
         values = []
-        discounted_f = self._discounted_cash_flow(f) if self.discounted else f
+        discounted_f = self._discounted(f) if self.discounted else f
         for quarter_n in range(0, self.tot_qtrs):
             if quarter_n < self.delay_qtrs:
                 values.append(0)
@@ -112,6 +112,24 @@ class CashFlow():
     def qtr(self):
         """calculates quarter for instance based on set function type"""
         return self._calculate_qtr(getattr(self, f'_{self.function.lower()}'))
+
+    @property
+    def discounted_qtr(self):
+        """returns cash flow profile, ignoring discounted"""
+        discounted = self.discounted
+        self.discounted = True
+        qtr = self.qtr
+        self.discounted = discounted
+        return qtr
+
+    @property
+    def non_discounted_qtr(self):
+        """returns cash flow profile, ignoring discounted"""
+        discounted = self.discounted
+        self.discounted = False
+        qtr = self.qtr
+        self.discounted = discounted
+        return qtr
     
     @property
     def sigmoid_qtr(self):
