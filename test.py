@@ -20,18 +20,11 @@ class TestCashFlow(unittest.TestCase):
         self.assertIsInstance(cf, CashFlow)
     
     def test_linear_cash_flow(self):
-        cf_kwargs = {
-            'delay_qtrs': 2,
-            'discount_rate': .5,
-            'is_cost': False,
-            'max_amt': 10,
-            'scale_up_qtrs': 4,
-            'function': 'linear',
-            'name': 'Test Profile',
-            'discounted': False,
-            'tot_qtrs': 8
-        }
-        cf = CashFlow(**cf_kwargs)
+        cf = CashFlow(
+            delay_qtrs=2, discount_rate=.5, is_cost=False, max_amt=10,
+            scale_up_qtrs=4, function='linear', name='Test Profile',
+            discounted=False, tot_qtrs=8
+        )
         self.assertListEqual(cf.qtr, [
             0,  # delayed
             0,  # delayed
@@ -42,6 +35,10 @@ class TestCashFlow(unittest.TestCase):
             10.0, # reach max
             10  # max value
         ])
+
+    @unittest.skip('not implemented')
+    def test_sigmoid_cash_flow(self):
+        pass
 
 
 if __name__ == '__main__':

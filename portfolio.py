@@ -32,6 +32,8 @@ class CashFlow():
         
     TODO:
         * `discount_rate` should not be required if `discounted` is `False`
+        * `discounted` attritubte should exist, but be private. `qtr` should also
+          be private (_qtr). The idea of a cash flow holding state is a flaw.
         * args/kwargs should be validated
         * function profile types should be class attributes, e.g. CashFlow.SIGMOIDs
     """
