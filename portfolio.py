@@ -10,7 +10,7 @@ class CashFlow():
     Args:
         delay_qtrs (int): Delay until cash flow starts to take effect
         discount_rate (float): Discount rate used in discounted cash
-            flow calculations
+            flow calculations.
         is_cost (boolean): Whether cash flow profile is a cost or not
         max_amt (float): Unitless amount that profile can scale up to
         scale_up_qtrs (int): How many quarters it takes to scale up a cash
@@ -18,6 +18,8 @@ class CashFlow():
         function (string): Profile type of cash flow
     
     Keyword arguments:
+        start_amt (float): Unitless amont that profile stars at after delay
+            period.
         name (string): Descriptive name of the cash flow (default '')
         discounted (boolean): Whether or not `.qtr` will return a discounted
             profile (default: True).
@@ -38,7 +40,7 @@ class CashFlow():
         * function profile types should be class attributes, e.g. CashFlow.SIGMOIDs
     """
     def __init__(self, delay_qtrs, discount_rate, is_cost, max_amt, scale_up_qtrs,
-                 function, name='', discounted=True, flow_id=uuid.uuid4(), tot_qtrs=12):
+                 function, start_amt=0, name='', discounted=True, flow_id=uuid.uuid4(), tot_qtrs=12):
         if scale_up_qtrs < 2: 
             raise Exception('the total number of quarters must be at least one')
 
@@ -51,6 +53,7 @@ class CashFlow():
         self.max_amt = max_amt
         self.name = name
         self.scale_up_qtrs = scale_up_qtrs
+        self.start_amt = start_amt
         self.tot_qtrs = tot_qtrs  # TODO: rename to "period"
         
     def _sigmoid(self, x):
@@ -97,7 +100,7 @@ class CashFlow():
             else:
                 multiplier = -1 if self.is_cost else 1
                 # TODO: multiply by -1 here if it is a COST we are considering
-                values.append(multiplier * discounted_f(quarter_n))
+                values.append(multiplier * discounted_f(quarter_n) + self.start_amt)
         return values
 
     def quick_view(self):
