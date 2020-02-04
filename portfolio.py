@@ -164,6 +164,7 @@ class CashFlow():
             "function": self.function,
             "is_cost": self.is_cost,
             "name": self.name,
+            "start_amt": self.start_amt,
             "max_amt": self.max_amt,
             "scale_up_qtrs": self.scale_up_qtrs,
             "tot_qtrs": self.tot_qtrs,
