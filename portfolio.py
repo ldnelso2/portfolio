@@ -5,8 +5,42 @@ import math
 from utils import Cell, SmartsheetRow
 
 class CashFlow():
+    """Generate a cash flow profile based on key assumptions
+    
+    Args:
+        delay_qtrs (int): Delay until cash flow starts to take effect
+        discount_rate (float): Discount rate used in discounted cash
+            flow calculations.
+        is_cost (boolean): Whether cash flow profile is a cost or not
+        max_amt (float): Unitless amount that profile can scale up to
+        scale_up_qtrs (int): How many quarters it takes to scale up a cash
+            flow.
+        function (string): Profile type of cash flow
+    
+    Keyword arguments:
+        start_amt (float): Unitless amont that profile stars at after delay
+            period.
+        name (string): Descriptive name of the cash flow (default '')
+        discounted (boolean): Whether or not `.qtr` will return a discounted
+            profile (default: True).
+        flow_id (UUID): A unique identifier for the cash flow. This is only
+            important deletes become a thing (default UUID).
+        tot_qtrs (int): Total number of quarters the profile will run over.
+            Essentially dictates the length of the resulting data output
+            (default 12).
+
+    Returns:
+        CashFlow instance
+        
+    TODO:
+        * `discount_rate` should not be required if `discounted` is `False`
+        * `discounted` attritubte should exist, but be private. `qtr` should also
+          be private (_qtr). The idea of a cash flow holding state is a flaw.
+        * args/kwargs should be validated
+        * function profile types should be class attributes, e.g. CashFlow.SIGMOIDs
+    """
     def __init__(self, delay_qtrs, discount_rate, is_cost, max_amt, scale_up_qtrs,
-                 function, name='', discounted=True, flow_id=uuid.uuid4(), tot_qtrs=12):
+                 function, start_amt=0, name='', discounted=True, flow_id=uuid.uuid4(), tot_qtrs=12):
         if scale_up_qtrs < 2: 
             raise Exception('the total number of quarters must be at least one')
 
@@ -19,6 +53,7 @@ class CashFlow():
         self.max_amt = max_amt
         self.name = name
         self.scale_up_qtrs = scale_up_qtrs
+        self.start_amt = start_amt
         self.tot_qtrs = tot_qtrs  # TODO: rename to "period"
         
     def _sigmoid(self, x):
@@ -49,7 +84,7 @@ class CashFlow():
     def _step(self, x):
         return self.max_amt
  
-    def _discounted_cash_flow(self, f):
+    def _discounted(self, f):
         @wraps(f)
         def discounted_wrapper(quarter_n):
             return f(quarter_n) / (1 + self.discount_rate) ** quarter_n
@@ -58,14 +93,14 @@ class CashFlow():
     
     def _calculate_qtr(self, f):
         values = []
-        discounted_f = self._discounted_cash_flow(f) if self.discounted else f
+        discounted_f = self._discounted(f) if self.discounted else f
         for quarter_n in range(0, self.tot_qtrs):
             if quarter_n < self.delay_qtrs:
                 values.append(0)
             else:
                 multiplier = -1 if self.is_cost else 1
                 # TODO: multiply by -1 here if it is a COST we are considering
-                values.append(multiplier * discounted_f(quarter_n))
+                values.append(multiplier * discounted_f(quarter_n) + self.start_amt)
         return values
 
     def quick_view(self):
@@ -82,21 +117,43 @@ class CashFlow():
     def qtr(self):
         """calculates quarter for instance based on set function type"""
         return self._calculate_qtr(getattr(self, f'_{self.function.lower()}'))
+
+    @property
+    def discounted_qtr(self):
+        """returns cash flow profile, ignoring discounted"""
+        discounted = self.discounted
+        self.discounted = True
+        qtr = self.qtr
+        self.discounted = discounted
+        return qtr
+
+    @property
+    def non_discounted_qtr(self):
+        """returns cash flow profile, ignoring discounted"""
+        discounted = self.discounted
+        self.discounted = False
+        qtr = self.qtr
+        self.discounted = discounted
+        return qtr
     
     @property
     def sigmoid_qtr(self):
+        """returns cash flow profile with a sigmoid profile, ignoring "function" attribute"""
         return self._calculate_qtr(self._sigmoid)
     
     @property
     def linear_qtr(self):
+        """returns cash flow profile with a linear profile, ignoring "function" attribute"""
         return self._calculate_qtr(self._linear)
     
     @property
     def step_qtr(self):
+        """returns cash flow profile with a step profile, ignoring "function" attribute"""
         return self._calculate_qtr(self._step)
     
     @property
     def single_qtr(self):
+        """returns cash flow profile with a one-time amounts, ignoring "function" attribute"""
         return self._calculate_qtr(self._single)
     
     def to_json(self):
@@ -107,6 +164,7 @@ class CashFlow():
             "function": self.function,
             "is_cost": self.is_cost,
             "name": self.name,
+            "start_amt": self.start_amt,
             "max_amt": self.max_amt,
             "scale_up_qtrs": self.scale_up_qtrs,
             "tot_qtrs": self.tot_qtrs,
@@ -133,7 +191,7 @@ class PortfolioSheetRow(SmartsheetRow):
     CELL_09 = Cell(9, 'is_cost', True)
     CELL_10 = Cell(10, 'function', True)
     CELL_11 = Cell(11, 'discount_rate', True)
-    CELL_12 = Cell(12, 'start_value', False)
+    CELL_12 = Cell(12, 'start_value', True)
     CELL_13 = Cell(13, 'delay_qtrs', True)
     CELL_14 = Cell(14, 'max_amt', True)
     CELL_15 = Cell(15, 'scale_up_qtrs', True)
