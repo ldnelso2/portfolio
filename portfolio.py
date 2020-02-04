@@ -191,7 +191,7 @@ class PortfolioSheetRow(SmartsheetRow):
     CELL_09 = Cell(9, 'is_cost', True)
     CELL_10 = Cell(10, 'function', True)
     CELL_11 = Cell(11, 'discount_rate', True)
-    CELL_12 = Cell(12, 'start_value', False)
+    CELL_12 = Cell(12, 'start_value', True)
     CELL_13 = Cell(13, 'delay_qtrs', True)
     CELL_14 = Cell(14, 'max_amt', True)
     CELL_15 = Cell(15, 'scale_up_qtrs', True)
