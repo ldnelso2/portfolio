@@ -39,12 +39,13 @@ class CashFlow():
         * args/kwargs should be validated
         * function profile types should be class attributes, e.g. CashFlow.SIGMOIDs
     """
-    def __init__(self, delay_qtrs, discount_rate, is_cost, max_amt, scale_up_qtrs,
+    def __init__(self, delay_qtrs, digital_gallons, discount_rate, is_cost, max_amt, scale_up_qtrs,
                  function, start_amt=0, name='', discounted=True, flow_id=uuid.uuid4(), tot_qtrs=12):
         if scale_up_qtrs < 2: 
             raise Exception('the total number of quarters must be at least one')
 
         self.delay_qtrs = delay_qtrs
+        self.digital_gallons = digital_gallons
         self.discounted = discounted
         self.discount_rate = discount_rate / 4 # annual discount rate -> quarterly
         self.function = function # Will interpret an instance according to this setting
@@ -159,6 +160,7 @@ class CashFlow():
     def to_json(self):
         return {
             "delay_qtrs": self.delay_qtrs,
+            "digital_gallons": self.digital_gallons,
             "discount_rate": self.discount_rate,
             "flow_id": str(self.id),
             "function": self.function,
@@ -197,7 +199,7 @@ class PortfolioSheetRow(SmartsheetRow):
     CELL_15 = Cell(15, 'scale_up_qtrs', True)
     CELL_16 = Cell(16, 'max_plants', False)
     CELL_17 = Cell(17, 'digital_gallons', True)
-    CELL_16 = Cell(16, 'comments', False)
+    CELL_16 = Cell(18, 'comments', False)
     
     def __init__(self, row):
         # Extra logic is used to decide if row should be processed at all
