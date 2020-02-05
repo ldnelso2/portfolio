@@ -2,6 +2,8 @@ import uuid
 from functools import wraps
 import math
 
+import matplotlib.pyplot as plt
+
 from utils import Cell, SmartsheetRow
 
 class CashFlow():
@@ -57,7 +59,7 @@ class CashFlow():
         self.start_amt = start_amt
         self.tot_qtrs = tot_qtrs  # TODO: rename to "period"
         
-    def _sigmoid(self, x):
+    def _sigmoid(self, x, max_amt):
         """
         We define y at 95% max at end of delay and scale up period 
         y = .95L = L / (1 + e^-k(x_end - x_naught)) # https://en.wikipedia.org/wiki/Logistic_function
@@ -68,27 +70,27 @@ class CashFlow():
         x_naught = self.delay_qtrs + self.scale_up_qtrs / 2
         x_end = self.delay_qtrs + self.scale_up_qtrs
         k = math.log(1/.95 - 1) / (x_naught - x_end)
-        return self.max_amt / (1 + math.exp(-k * (x - x_naught)))
+        return min(max_amt / (1 + math.exp(-k * (x - x_naught))), max_amt)
     
-    def _linear(self, x):
+    def _linear(self, x, max_amt):
         """y = mx + b. Units in amount (returned value) per quarter (x)"""
-        m = self.max_amt / self.scale_up_qtrs
+        m = max_amt / self.scale_up_qtrs
         b = -m * self.delay_qtrs
-        return min(m * x + b, self.max_amt) # Never return more than max
+        return min(m * x + b, max_amt) # Never return more than max
     
-    def _single(self, x):
+    def _single(self, x, max_amt):
         if x == self.delay_qtrs:
-            return self.max_amt
+            return max_amt
         else:
             return 0
     
-    def _step(self, x):
-        return self.max_amt
+    def _step(self, x, max_amt):
+        return max_amt
  
     def _discounted(self, f):
         @wraps(f)
-        def discounted_wrapper(quarter_n):
-            return f(quarter_n) / (1 + self.discount_rate) ** quarter_n
+        def discounted_wrapper(quarter_n, max_amt):
+            return f(quarter_n, max_amt) / (1 + self.discount_rate) ** quarter_n
 
         return discounted_wrapper
     
@@ -100,8 +102,17 @@ class CashFlow():
                 values.append(0)
             else:
                 multiplier = -1 if self.is_cost else 1
-                # TODO: multiply by -1 here if it is a COST we are considering
-                values.append(multiplier * discounted_f(quarter_n) + self.start_amt)
+                values.append(multiplier * discounted_f(quarter_n, self.max_amt) + self.start_amt)
+        return values
+
+    def _calculate_dg_qtr(self, f):
+        """calculates digital gallons per quarter"""
+        values = []
+        for quarter_n in range(0, self.tot_qtrs):
+            if quarter_n < self.delay_qtrs:
+                values.append(0)
+            else:
+                values.append(f(quarter_n, self.digital_gallons))
         return values
 
     def quick_view(self):
@@ -113,11 +124,16 @@ class CashFlow():
         ax.scatter(range(self.tot_qtrs), self.single_qtr, label='single')
         ax.legend(loc='upper left')
         ax.grid(True)
-    
+
     @property
     def qtr(self):
         """calculates quarter for instance based on set function type"""
         return self._calculate_qtr(getattr(self, f'_{self.function.lower()}'))
+
+    @property
+    def dg_qtr(self):
+        """calculates quarter values for digital gallons"""
+        return self._calculate_dg_qtr(getattr(self, f'_{self.function.lower()}'))
 
     @property
     def discounted_qtr(self):
@@ -156,6 +172,26 @@ class CashFlow():
     def single_qtr(self):
         """returns cash flow profile with a one-time amounts, ignoring "function" attribute"""
         return self._calculate_qtr(self._single)
+
+    @property
+    def dg_sigmoid_qtr(self):
+        """returns digital gallon profile with a sigmoid profile, ignoring "function" attribute"""
+        return self._calculate_dg_qtr(self._sigmoid)
+    
+    @property
+    def dg_linear_qtr(self):
+        """returns digital gallon profile with a linear profile, ignoring "function" attribute"""
+        return self._calculate_dg_qtr(self._linear)
+    
+    @property
+    def dg_step_qtr(self):
+        """returns digital gallon profile with a step profile, ignoring "function" attribute"""
+        return self._calculate_dg_qtr(self._step)
+    
+    @property
+    def dg_single_qtr(self):
+        """returns digital gallon profile with a one-time amounts, ignoring "function" attribute"""
+        return self._calculate_dg_qtr(self._single)
     
     def to_json(self):
         return {
