@@ -2,6 +2,8 @@ import uuid
 from functools import wraps
 import math
 
+import matplotlib.pyplot as plt
+
 from utils import Cell, SmartsheetRow
 
 class CashFlow():
@@ -39,12 +41,13 @@ class CashFlow():
         * args/kwargs should be validated
         * function profile types should be class attributes, e.g. CashFlow.SIGMOIDs
     """
-    def __init__(self, delay_qtrs, discount_rate, is_cost, max_amt, scale_up_qtrs,
+    def __init__(self, delay_qtrs, digital_gallons, discount_rate, is_cost, max_amt, scale_up_qtrs,
                  function, start_amt=0, name='', discounted=True, flow_id=uuid.uuid4(), tot_qtrs=12):
         if scale_up_qtrs < 2: 
             raise Exception('the total number of quarters must be at least one')
 
         self.delay_qtrs = delay_qtrs
+        self.digital_gallons = digital_gallons
         self.discounted = discounted
         self.discount_rate = discount_rate / 4 # annual discount rate -> quarterly
         self.function = function # Will interpret an instance according to this setting
@@ -56,7 +59,7 @@ class CashFlow():
         self.start_amt = start_amt
         self.tot_qtrs = tot_qtrs  # TODO: rename to "period"
         
-    def _sigmoid(self, x):
+    def _sigmoid(self, x, max_amt):
         """
         We define y at 95% max at end of delay and scale up period 
         y = .95L = L / (1 + e^-k(x_end - x_naught)) # https://en.wikipedia.org/wiki/Logistic_function
@@ -67,27 +70,27 @@ class CashFlow():
         x_naught = self.delay_qtrs + self.scale_up_qtrs / 2
         x_end = self.delay_qtrs + self.scale_up_qtrs
         k = math.log(1/.95 - 1) / (x_naught - x_end)
-        return self.max_amt / (1 + math.exp(-k * (x - x_naught)))
+        return min(max_amt / (1 + math.exp(-k * (x - x_naught))), max_amt)
     
-    def _linear(self, x):
+    def _linear(self, x, max_amt):
         """y = mx + b. Units in amount (returned value) per quarter (x)"""
-        m = self.max_amt / self.scale_up_qtrs
+        m = max_amt / self.scale_up_qtrs
         b = -m * self.delay_qtrs
-        return min(m * x + b, self.max_amt) # Never return more than max
+        return min(m * x + b, max_amt) # Never return more than max
     
-    def _single(self, x):
+    def _single(self, x, max_amt):
         if x == self.delay_qtrs:
-            return self.max_amt
+            return max_amt
         else:
             return 0
     
-    def _step(self, x):
-        return self.max_amt
+    def _step(self, x, max_amt):
+        return max_amt
  
     def _discounted(self, f):
         @wraps(f)
-        def discounted_wrapper(quarter_n):
-            return f(quarter_n) / (1 + self.discount_rate) ** quarter_n
+        def discounted_wrapper(quarter_n, max_amt):
+            return f(quarter_n, max_amt) / (1 + self.discount_rate) ** quarter_n
 
         return discounted_wrapper
     
@@ -99,8 +102,17 @@ class CashFlow():
                 values.append(0)
             else:
                 multiplier = -1 if self.is_cost else 1
-                # TODO: multiply by -1 here if it is a COST we are considering
-                values.append(multiplier * discounted_f(quarter_n) + self.start_amt)
+                values.append(multiplier * discounted_f(quarter_n, self.max_amt) + self.start_amt)
+        return values
+
+    def _calculate_dg_qtr(self, f):
+        """calculates digital gallons per quarter"""
+        values = []
+        for quarter_n in range(0, self.tot_qtrs):
+            if quarter_n < self.delay_qtrs:
+                values.append(0)
+            else:
+                values.append(f(quarter_n, self.digital_gallons))
         return values
 
     def quick_view(self):
@@ -112,11 +124,16 @@ class CashFlow():
         ax.scatter(range(self.tot_qtrs), self.single_qtr, label='single')
         ax.legend(loc='upper left')
         ax.grid(True)
-    
+
     @property
     def qtr(self):
         """calculates quarter for instance based on set function type"""
         return self._calculate_qtr(getattr(self, f'_{self.function.lower()}'))
+
+    @property
+    def dg_qtr(self):
+        """calculates quarter values for digital gallons"""
+        return self._calculate_dg_qtr(getattr(self, f'_{self.function.lower()}'))
 
     @property
     def discounted_qtr(self):
@@ -155,10 +172,31 @@ class CashFlow():
     def single_qtr(self):
         """returns cash flow profile with a one-time amounts, ignoring "function" attribute"""
         return self._calculate_qtr(self._single)
+
+    @property
+    def dg_sigmoid_qtr(self):
+        """returns digital gallon profile with a sigmoid profile, ignoring "function" attribute"""
+        return self._calculate_dg_qtr(self._sigmoid)
+    
+    @property
+    def dg_linear_qtr(self):
+        """returns digital gallon profile with a linear profile, ignoring "function" attribute"""
+        return self._calculate_dg_qtr(self._linear)
+    
+    @property
+    def dg_step_qtr(self):
+        """returns digital gallon profile with a step profile, ignoring "function" attribute"""
+        return self._calculate_dg_qtr(self._step)
+    
+    @property
+    def dg_single_qtr(self):
+        """returns digital gallon profile with a one-time amounts, ignoring "function" attribute"""
+        return self._calculate_dg_qtr(self._single)
     
     def to_json(self):
         return {
             "delay_qtrs": self.delay_qtrs,
+            "digital_gallons": self.digital_gallons,
             "discount_rate": self.discount_rate,
             "flow_id": str(self.id),
             "function": self.function,
@@ -195,7 +233,9 @@ class PortfolioSheetRow(SmartsheetRow):
     CELL_13 = Cell(13, 'delay_qtrs', True)
     CELL_14 = Cell(14, 'max_amt', True)
     CELL_15 = Cell(15, 'scale_up_qtrs', True)
-    CELL_16 = Cell(16, 'comments', False)
+    CELL_16 = Cell(16, 'max_plants', False)
+    CELL_17 = Cell(17, 'digital_gallons', True)
+    CELL_16 = Cell(18, 'comments', False)
     
     def __init__(self, row):
         # Extra logic is used to decide if row should be processed at all
