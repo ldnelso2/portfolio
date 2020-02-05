@@ -195,6 +195,8 @@ class PortfolioSheetRow(SmartsheetRow):
     CELL_13 = Cell(13, 'delay_qtrs', True)
     CELL_14 = Cell(14, 'max_amt', True)
     CELL_15 = Cell(15, 'scale_up_qtrs', True)
+    CELL_16 = Cell(16, 'max_plants', False)
+    CELL_17 = Cell(17, 'digital_gallons', True)
     CELL_16 = Cell(16, 'comments', False)
     
     def __init__(self, row):
