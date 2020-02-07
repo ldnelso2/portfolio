@@ -23,8 +23,6 @@ class CashFlow():
         start_amt (float): Unitless amont that profile stars at after delay
             period.
         name (string): Descriptive name of the cash flow (default '')
-        discounted (boolean): Whether or not `.qtr` will return a discounted
-            profile (default: True).
         flow_id (UUID): A unique identifier for the cash flow. This is only
             important deletes become a thing (default UUID).
         tot_qtrs (int): Total number of quarters the profile will run over.
@@ -42,13 +40,13 @@ class CashFlow():
         * function profile types should be class attributes, e.g. CashFlow.SIGMOIDs
     """
     def __init__(self, delay_qtrs, digital_gallons, discount_rate, is_cost, max_amt, scale_up_qtrs,
-                 function, start_amt=0, name='', discounted=True, flow_id=uuid.uuid4(), tot_qtrs=12):
+                 function, start_amt=0, name='', flow_id=uuid.uuid4(), tot_qtrs=12):
         if scale_up_qtrs < 2: 
             raise Exception('the total number of quarters must be at least one')
 
         self.delay_qtrs = delay_qtrs
         self.digital_gallons = digital_gallons
-        self.discounted = discounted
+        self.discounted = True  # TODO: remove this and keep methods functional
         self.discount_rate = discount_rate / 4 # annual discount rate -> quarterly
         self.function = function # Will interpret an instance according to this setting
         self.id = flow_id
