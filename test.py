@@ -28,6 +28,7 @@ class TestCashFlow(unittest.TestCase):
             self.start_amt + (self.max_amt - self.start_amt) / 2
         )
         self.end_scale_point = Point(self.delay_qtrs + self.scale_up_qtrs, self.max_amt)
+        # Since the sigmoid is written to hit poits at 95% of value, it's off by 5%
         self.sigmoid_correction = (self.max_amt - self.start_amt) * .05
 
     def set_prop(self, attr, value):
@@ -59,8 +60,7 @@ class TestCashFlow(unittest.TestCase):
         self.assertEqual(qtr[self.mid_scale_point.x], self.mid_scale_point.y)
         self.assertAlmostEqual(qtr[self.end_scale_point.x], end_y)
 
-        # Starting at 1 won't break the curve fit
-        self.set_prop('start_amt', 1)
+        self.set_prop('start_amt', 0)
         qtr = self.cf.sigmoid_qtr(discounted=False)
         start_y = self.start_scale_point.y + self.sigmoid_correction
         end_y = self.end_scale_point.y - self.sigmoid_correction
