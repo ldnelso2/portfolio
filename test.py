@@ -1,44 +1,72 @@
 import unittest
 import uuid
 
+from collections import namedtuple
+
 from portfolio import CashFlow
 
+
+Point = namedtuple('Point', ['x', 'y'])
+
 class TestCashFlow(unittest.TestCase):
+    def setUp(self):
+        self.delay_qtrs = 2
+        self.scale_up_qtrs = 4
+        self.start_amt = 1
+        self.max_amt = 5
+        self.cf = CashFlow(
+            delay_qtrs=self.delay_qtrs, digital_gallons=5, discount_rate=.1, function='sigmoid',
+            is_cost=False, start_amt=self.start_amt, max_amt=self.max_amt, scale_up_qtrs=self.scale_up_qtrs,
+            tot_qtrs=8, name='test'
+        )
+        self.update_points()
+
+    def update_points(self):
+        self.start_scale_point = Point(self.delay_qtrs, self.start_amt)
+        self.mid_scale_point = Point(
+            self.delay_qtrs + self.scale_up_qtrs // 2,
+            self.start_amt + (self.max_amt - self.start_amt) / 2
+        )
+        self.end_scale_point = Point(self.delay_qtrs + self.scale_up_qtrs, self.max_amt)
+        self.sigmoid_correction = (self.max_amt - self.start_amt) * .05
+
+    def set_prop(self, attr, value):
+        """Updates `delay_qtrs` and other instance attrs, also updates CashFlow instance"""
+        setattr(self, attr, value)
+        setattr(self.cf, attr, value)
+        self.update_points()
 
     def test_can_create_instance(self):
-        cf_kwargs = {
-            'delay_qtrs': 2,
-            'discount_rate': .5,
-            'is_cost': False,
-            'max_amt': .4,
-            'scale_up_qtrs': 4,
-            'function': 'linear',
-            'name': 'Test Profile',
-            'digital_gallons': 100,
-        }
-        cf = CashFlow(**cf_kwargs)
-        self.assertIsInstance(cf, CashFlow)
+        self.assertIsInstance(self.cf, CashFlow)
     
-    def test_linear_cash_flow(self):
-        cf = CashFlow(
-            delay_qtrs=2, discount_rate=.5, is_cost=False, max_amt=10, digital_gallons=100,
-            scale_up_qtrs=4, function='linear', name='Test Profile', tot_qtrs=8
-        )
-        self.assertListEqual(cf.non_discounted_qtr, [
-            0,  # delayed
-            0,  # delayed
-            0.0,  # scaling
-            2.5,  # scaling
-            5.0,  # scalings
-            7.5,  # scaling
-            10.0, # reach max
-            10  # max value
-        ])
+    def test_key_points_linear(self):
+        qtr = self.cf.linear_qtr(discounted=False)
+        self.assertEqual(qtr[self.start_scale_point.x], self.start_scale_point.y)
+        self.assertEqual(qtr[self.mid_scale_point.x], self.mid_scale_point.y)
+        self.assertEqual(qtr[self.end_scale_point.x], self.end_scale_point.y)
 
-    @unittest.skip('not implemented')
-    def test_sigmoid_cash_flow(self):
-        pass
+        self.set_prop('start_amt', 0)
+        qtr = self.cf.linear_qtr(discounted=False)
+        self.assertEqual(qtr[self.start_scale_point.x], self.start_scale_point.y)
+        self.assertEqual(qtr[self.mid_scale_point.x], self.mid_scale_point.y)
+        self.assertEqual(qtr[self.end_scale_point.x], self.end_scale_point.y)
 
+    def test_key_points_sigmoid(self):
+        qtr = self.cf.sigmoid_qtr(discounted=False)
+        start_y = self.start_scale_point.y + self.sigmoid_correction
+        end_y = self.end_scale_point.y - self.sigmoid_correction
+        self.assertAlmostEqual(qtr[self.start_scale_point.x], start_y)
+        self.assertEqual(qtr[self.mid_scale_point.x], self.mid_scale_point.y)
+        self.assertAlmostEqual(qtr[self.end_scale_point.x], end_y)
+
+        # Starting at 1 won't break the curve fit
+        self.set_prop('start_amt', 1)
+        qtr = self.cf.sigmoid_qtr(discounted=False)
+        start_y = self.start_scale_point.y + self.sigmoid_correction
+        end_y = self.end_scale_point.y - self.sigmoid_correction
+        self.assertAlmostEqual(qtr[self.start_scale_point.x], start_y)
+        self.assertEqual(qtr[self.mid_scale_point.x], self.mid_scale_point.y)
+        self.assertAlmostEqual(qtr[self.end_scale_point.x], end_y)
 
 if __name__ == '__main__':
     unittest.main()
