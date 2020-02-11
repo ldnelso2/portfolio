@@ -14,23 +14,22 @@ class TestCashFlow(unittest.TestCase):
             'scale_up_qtrs': 4,
             'function': 'linear',
             'name': 'Test Profile',
-            'discounted': False,
+            'digital_gallons': 100,
         }
         cf = CashFlow(**cf_kwargs)
         self.assertIsInstance(cf, CashFlow)
     
     def test_linear_cash_flow(self):
         cf = CashFlow(
-            delay_qtrs=2, discount_rate=.5, is_cost=False, max_amt=10,
-            scale_up_qtrs=4, function='linear', name='Test Profile',
-            discounted=False, tot_qtrs=8
+            delay_qtrs=2, discount_rate=.5, is_cost=False, max_amt=10, digital_gallons=100,
+            scale_up_qtrs=4, function='linear', name='Test Profile', tot_qtrs=8
         )
-        self.assertListEqual(cf.qtr, [
+        self.assertListEqual(cf.non_discounted_qtr, [
             0,  # delayed
             0,  # delayed
             0.0,  # scaling
             2.5,  # scaling
-            5.0,  # scaling
+            5.0,  # scalings
             7.5,  # scaling
             10.0, # reach max
             10  # max value

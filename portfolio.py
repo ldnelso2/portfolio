@@ -23,8 +23,6 @@ class CashFlow():
         start_amt (float): Unitless amont that profile stars at after delay
             period.
         name (string): Descriptive name of the cash flow (default '')
-        discounted (boolean): Whether or not `.qtr` will return a discounted
-            profile (default: True).
         flow_id (UUID): A unique identifier for the cash flow. This is only
             important deletes become a thing (default UUID).
         tot_qtrs (int): Total number of quarters the profile will run over.
@@ -42,13 +40,12 @@ class CashFlow():
         * function profile types should be class attributes, e.g. CashFlow.SIGMOIDs
     """
     def __init__(self, delay_qtrs, digital_gallons, discount_rate, is_cost, max_amt, scale_up_qtrs,
-                 function, start_amt=0, name='', discounted=True, flow_id=uuid.uuid4(), tot_qtrs=12):
+                 function, start_amt=0, name='', flow_id=uuid.uuid4(), tot_qtrs=12):
         if scale_up_qtrs < 2: 
             raise Exception('the total number of quarters must be at least one')
 
         self.delay_qtrs = delay_qtrs
         self.digital_gallons = digital_gallons
-        self.discounted = discounted
         self.discount_rate = discount_rate / 4 # annual discount rate -> quarterly
         self.function = function # Will interpret an instance according to this setting
         self.id = flow_id
@@ -94,9 +91,9 @@ class CashFlow():
 
         return discounted_wrapper
     
-    def _calculate_qtr(self, f):
+    def _calculate_qtr(self, f, discounted):
         values = []
-        discounted_f = self._discounted(f) if self.discounted else f
+        discounted_f = self._discounted(f) if discounted else f
         for quarter_n in range(0, self.tot_qtrs):
             if quarter_n < self.delay_qtrs:
                 values.append(0)
@@ -105,14 +102,15 @@ class CashFlow():
                 values.append(multiplier * discounted_f(quarter_n, self.max_amt) + self.start_amt)
         return values
 
-    def _calculate_dg_qtr(self, f):
+    def _calculate_dg_qtr(self, f, discounted):
         """calculates digital gallons per quarter"""
         values = []
+        discounted_f = self._discounted(f) if discounted else f
         for quarter_n in range(0, self.tot_qtrs):
             if quarter_n < self.delay_qtrs:
                 values.append(0)
             else:
-                values.append(f(quarter_n, self.digital_gallons))
+                values.append(discounted_f(quarter_n, self.digital_gallons))
         return values
 
     def quick_view(self):
@@ -124,74 +122,63 @@ class CashFlow():
         ax.scatter(range(self.tot_qtrs), self.single_qtr, label='single')
         ax.legend(loc='upper left')
         ax.grid(True)
-
-    @property
-    def qtr(self):
+    
+    def _qtr(self, discounted):
         """calculates quarter for instance based on set function type"""
-        return self._calculate_qtr(getattr(self, f'_{self.function.lower()}'))
+        return self._calculate_qtr(getattr(self, f'_{self.function.lower()}'), discounted)
+
+    def _dg_qtr(self, discounted):
+        """calculates quarter values for digital gallons"""
+        return self._calculate_dg_qtr(getattr(self, f'_{self.function.lower()}'), discounted)
 
     @property
-    def dg_qtr(self):
-        """calculates quarter values for digital gallons"""
-        return self._calculate_dg_qtr(getattr(self, f'_{self.function.lower()}'))
+    def non_discounted_qtr(self):
+        return self._qtr(False)
 
     @property
     def discounted_qtr(self):
         """returns cash flow profile, ignoring discounted"""
-        discounted = self.discounted
-        self.discounted = True
-        qtr = self.qtr
-        self.discounted = discounted
-        return qtr
+        return self._qtr(True)
 
     @property
-    def non_discounted_qtr(self):
-        """returns cash flow profile, ignoring discounted"""
-        discounted = self.discounted
-        self.discounted = False
-        qtr = self.qtr
-        self.discounted = discounted
-        return qtr
+    def non_discounted_dg_qtr(self):
+        return self._dg_qtr(False)
     
     @property
-    def sigmoid_qtr(self):
+    def discounted_dg_qtr(self):
+        return self._dg_qtr(True)
+
+    def sigmoid_qtr(self, discounted=True):
         """returns cash flow profile with a sigmoid profile, ignoring "function" attribute"""
-        return self._calculate_qtr(self._sigmoid)
-    
-    @property
-    def linear_qtr(self):
-        """returns cash flow profile with a linear profile, ignoring "function" attribute"""
-        return self._calculate_qtr(self._linear)
-    
-    @property
-    def step_qtr(self):
-        """returns cash flow profile with a step profile, ignoring "function" attribute"""
-        return self._calculate_qtr(self._step)
-    
-    @property
-    def single_qtr(self):
-        """returns cash flow profile with a one-time amounts, ignoring "function" attribute"""
-        return self._calculate_qtr(self._single)
+        return self._calculate_qtr(self._sigmoid, discounted)
 
-    @property
-    def dg_sigmoid_qtr(self):
+    def linear_qtr(self, discounted=True):
+        """returns cash flow profile with a linear profile, ignoring "function" attribute"""
+        return self._calculate_qtr(self._linear, discounted)
+    
+    def step_qtr(self, discounted=True):
+        """returns cash flow profile with a step profile, ignoring "function" attribute"""
+        return self._calculate_qtr(self._step, discounted)
+    
+    def single_qtr(self, discounted=True):
+        """returns cash flow profile with a one-time amounts, ignoring "function" attribute"""
+        return self._calculate_qtr(self._single, discounted)
+
+    def sigmoid_dg_qtr(self, discounted=True):
         """returns digital gallon profile with a sigmoid profile, ignoring "function" attribute"""
-        return self._calculate_dg_qtr(self._sigmoid)
-    
-    @property
-    def dg_linear_qtr(self):
+        return self._calculate_dg_qtr(self._sigmoid, discounted)
+
+    def linear_dg_qtr(self, discounted=True):
         """returns digital gallon profile with a linear profile, ignoring "function" attribute"""
-        return self._calculate_dg_qtr(self._linear)
-    
-    @property
-    def dg_step_qtr(self):
+        return self._calculate_dg_qtr(self._linear, discounted)
+
+    def step_dg_qtr(self, discounted=True):
         """returns digital gallon profile with a step profile, ignoring "function" attribute"""
-        return self._calculate_dg_qtr(self._step)
-    
-    @property
-    def dg_single_qtr(self):
+        return self._calculate_dg_qtr(self._step, discounted)
+
+    def single_dg_qtr(self, discounted=True):
         """returns digital gallon profile with a one-time amounts, ignoring "function" attribute"""
-        return self._calculate_dg_qtr(self._single)
+        return self._calculate_dg_qtr(self._single, discounted)
     
     def to_json(self):
         return {
@@ -208,6 +195,11 @@ class CashFlow():
             "tot_qtrs": self.tot_qtrs,
         }
 
+
+def combine_flows(flows, attribute):
+    values = map(lambda cf: getattr(cf, attribute), flows)
+    aggregated_values = [sum(values) for values in zip(*values)]
+    return aggregated_values
 
 
 class PortfolioSheetRow(SmartsheetRow):

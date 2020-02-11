@@ -14,10 +14,10 @@ class SmartsheetRow():
     inherit from this one, and automatically load and process all defined attributes.
     It is also possible to define methods to override the value when necessary. For example, divide an
     annual value by four"""
-    def __init__(self, row):
-        self.sheet_row = row
-        self.cells = row['cells']
-        self.row_number = row['rowNumber']
+    def __init__(self, row_dict):
+        self.row_dict = row_dict
+        self.cells = row_dict['cells']
+        self.row_number = row_dict['rowNumber']
         # essentially grab the class attributes
         self.cell_defs = [getattr(self, attr) for attr in dir(self) if 'CELL_' in attr]
         self._load_cells()
@@ -47,8 +47,28 @@ class SmartsheetRow():
 
     def to_json(self):
         cell_defs = [getattr(self, attr) for attr in dir(self) if 'CELL_' in attr]
-        return { cd.name: getattr(self, cd.name) for cd in cell_defs}
+        return { cd.name: getattr(self, cd.name) for cd in cell_defs }
 
+
+def get_smartsheet_cell(row, col, sheet, attribute=None):
+    """"Returns cell value from passed in sheet
+    
+    Args:
+        row (int) - row number to access
+        col (int) - col number to access
+        sheet     - SmartSheet sheet instance
+        attribute (str | None) - If None, return dictionary of cell
+            data. If provided, returns attribute.
+    """
+    try:
+        row = sheet.rows[row - 1 ] # -1 for 0 based indexing
+        cells = row.to_dict()['cells']
+        cell_value = cells[col - 1] # -1 for 0 based indexing
+        return cell_value if attribute is None else cell_value[attribute]
+    except IndexError:
+        return None
+    except AttributeError:
+        raise Exception(f'<{attribute}> does not exist in row')
 
 def _clamp(val, minimum=0, maximum=255):
     if val < minimum:
