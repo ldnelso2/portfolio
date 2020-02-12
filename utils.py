@@ -112,7 +112,7 @@ def human_currency_format(num):
     while abs(num) >= 1000:
         magnitude += 1
         num /= 1000.0
-    return '{}{}'.format('{:f}'.format(num).rstrip('0').rstrip('.'), ['', 'K', 'M', 'B', 'T'][magnitude])
+    return '{}{}'.format('{:f}'.format(num).rstrip('0').rstrip('.'), ['', 'k', 'm', 'b', 't'][magnitude])
 
 def currency_fmt_to_cols(cols):
     return lambda col: col.apply(human_currency_format) if col.name in cols else col

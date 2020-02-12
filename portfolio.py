@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 
 from utils import Cell, SmartsheetRow
 
+def discount(val, discount_rate, period_n):
+    return val / ((1 + discount_rate) ** period_n)
+
 class CashFlow():
     """Generate a cash flow profile based on key assumptions
     
@@ -85,7 +88,7 @@ class CashFlow():
         return max_amt - start_amt
     
     def _discounted(self, val, period_n):
-        return val / ((1 + self.discount_rate) ** period_n)
+        return discount(val, self.discount_rate, period_n)
  
     def _calculate_qtr(self, f, discounted):
         values = []
