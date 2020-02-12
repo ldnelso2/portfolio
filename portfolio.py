@@ -117,6 +117,7 @@ class CashFlow():
 
     def quick_view(self, discounted=True):
         fig = plt.figure()
+        fig.patch.set_facecolor('#ffffff')
         ax = fig.add_subplot(1, 1, 1)
         x_labels = quarter_labels = ['Q' + str(q) for q in range(1, self.tot_qtrs + 1)]
         ax.plot(x_labels, self.sigmoid_qtr(discounted=discounted), label='sigmoid')
@@ -244,6 +245,7 @@ class PortfolioSheetRow(SmartsheetRow):
         # This allows us to "fail fast" when a row we want to parse doesn't have the data we want
         cells = row['cells']
         include = cells[PortfolioSheetRow.CELL_04.index].get('value', None)
+        self.amt_unit_conversion = 10**6 # covert from millions to dollars
         self.project_code = cells[PortfolioSheetRow.CELL_05.index].get('value', None)
         self.include_in_model = True if include == "Yes" else False
         
@@ -272,7 +274,14 @@ class PortfolioSheetRow(SmartsheetRow):
     def _is_cost(val):
         return val.lower() == 'cost'
 
-    
+    def _max_amt(self, val):
+        """Annual value to numer of periods in a year"""
+        return (val * self.amt_unit_conversion) / 4
+
+    def _start_value(self, val):
+        return (val * self.amt_unit_conversion) / 4
+
+
 def debug_row(row_num, sheet):
     """Very quickly see how the parser parses and outputs any single row"""
     row = sheet.rows[row_num - 1]
