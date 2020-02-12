@@ -83,36 +83,38 @@ class CashFlow():
     
     def _step(self, x, max_amt, start_amt):
         return max_amt - start_amt
- 
-    def _discounted(self, f):
-        @wraps(f)
-        def discounted_wrapper(quarter_n, max_amt, start_amt):
-            return f(quarter_n, max_amt, start_amt) / (1 + self.discount_rate) ** quarter_n
-
-        return discounted_wrapper
     
+    def _discounted(self, val, period_n):
+        return val / ((1 + self.discount_rate) ** period_n)
+ 
     def _calculate_qtr(self, f, discounted):
         values = []
-        discounted_f = self._discounted(f) if discounted else f
         for quarter_n in range(0, self.tot_qtrs):
             if quarter_n < self.delay_qtrs:
                 values.append(0)
             else:
                 multiplier = -1 if self.is_cost else 1
-                amt = discounted_f(quarter_n, self.max_amt, self.start_amt)
-                values.append(multiplier * amt + self.start_amt)
+                amt = f(quarter_n, self.max_amt, self.start_amt) + self.start_amt
+                amt = multiplier * amt
+                if discounted:
+                    amt = self._discounted(amt, quarter_n)
+
+                values.append(amt)
         return values
 
     def _calculate_dg_qtr(self, f, discounted):
         """calculates digital gallons per quarter"""
         values = []
-        discounted_f = self._discounted(f) if discounted else f
         for quarter_n in range(0, self.tot_qtrs):
             if quarter_n < self.delay_qtrs:
                 values.append(0)
             else:
                 start_gallons = 0
-                values.append(discounted_f(quarter_n, self.digital_gallons, start_gallons))
+                amt = f(quarter_n, self.digital_gallons, start_gallons)
+                if discounted:
+                    amt = self._discounted(amt, quarter_n)
+
+                values.append(amt)
         return values
 
     def quick_view(self, discounted=True):
