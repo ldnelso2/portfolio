@@ -105,3 +105,14 @@ def colorscale(hexstr, scalefactor):
     b = _clamp(b * scalefactor)
 
     return "#%02x%02x%02x" % (r, g, b)
+
+def human_currency_format(num):
+    num = float('{:.3g}'.format(num))
+    magnitude = 0
+    while abs(num) >= 1000:
+        magnitude += 1
+        num /= 1000.0
+    return '{}{}'.format('{:f}'.format(num).rstrip('0').rstrip('.'), ['', 'K', 'M', 'B', 'T'][magnitude])
+
+def currency_fmt_to_cols(cols):
+    return lambda col: col.apply(human_currency_format) if col.name in cols else col
