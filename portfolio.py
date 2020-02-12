@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 
 from utils import Cell, SmartsheetRow
 
+def discount(val, discount_rate, period_n):
+    return val / ((1 + discount_rate) ** period_n)
+
 class CashFlow():
     """Generate a cash flow profile based on key assumptions
     
@@ -56,7 +59,7 @@ class CashFlow():
         self.start_amt = start_amt
         self.tot_qtrs = tot_qtrs  # TODO: rename to "period"
         
-    def _sigmoid(self, x, max_amt):
+    def _sigmoid(self, x, max_amt, start_amt):
         """
         We define y at 95% max at end of delay and scale up period 
         y = .95L = L / (1 + e^-k(x_end - x_naught)) # https://en.wikipedia.org/wiki/Logistic_function
@@ -67,59 +70,72 @@ class CashFlow():
         x_naught = self.delay_qtrs + self.scale_up_qtrs / 2
         x_end = self.delay_qtrs + self.scale_up_qtrs
         k = math.log(1/.95 - 1) / (x_naught - x_end)
-        return min(max_amt / (1 + math.exp(-k * (x - x_naught))), max_amt)
+        return min((max_amt - start_amt) / (1 + math.exp(-k * (x - x_naught))), (max_amt - start_amt))
     
-    def _linear(self, x, max_amt):
+    def _linear(self, x, max_amt, start_amt):
         """y = mx + b. Units in amount (returned value) per quarter (x)"""
-        m = max_amt / self.scale_up_qtrs
+        m = (max_amt - start_amt) / self.scale_up_qtrs
         b = -m * self.delay_qtrs
-        return min(m * x + b, max_amt) # Never return more than max
+        return min(m * x + b, max_amt - start_amt) # Never return more than max
     
-    def _single(self, x, max_amt):
+    def _single(self, x, max_amt, start_amt):
         if x == self.delay_qtrs:
-            return max_amt
+            return max_amt - start_amt
         else:
-            return 0
+            return -1 * start_amt
     
-    def _step(self, x, max_amt):
-        return max_amt
+    def _step(self, x, max_amt, start_amt):
+        return max_amt - start_amt
+    
+    def _discounted(self, val, period_n):
+        return discount(val, self.discount_rate, period_n)
  
-    def _discounted(self, f):
-        @wraps(f)
-        def discounted_wrapper(quarter_n, max_amt):
-            return f(quarter_n, max_amt) / (1 + self.discount_rate) ** quarter_n
-
-        return discounted_wrapper
-    
     def _calculate_qtr(self, f, discounted):
         values = []
-        discounted_f = self._discounted(f) if discounted else f
         for quarter_n in range(0, self.tot_qtrs):
             if quarter_n < self.delay_qtrs:
                 values.append(0)
             else:
                 multiplier = -1 if self.is_cost else 1
-                values.append(multiplier * discounted_f(quarter_n, self.max_amt) + self.start_amt)
+                amt = f(quarter_n, self.max_amt, self.start_amt) + self.start_amt
+                amt = multiplier * amt
+                if discounted:
+                    amt = self._discounted(amt, quarter_n)
+
+                values.append(amt)
         return values
 
     def _calculate_dg_qtr(self, f, discounted):
         """calculates digital gallons per quarter"""
         values = []
-        discounted_f = self._discounted(f) if discounted else f
         for quarter_n in range(0, self.tot_qtrs):
             if quarter_n < self.delay_qtrs:
                 values.append(0)
             else:
-                values.append(discounted_f(quarter_n, self.digital_gallons))
+                start_gallons = 0
+                amt = f(quarter_n, self.digital_gallons, start_gallons)
+                if discounted:
+                    amt = self._discounted(amt, quarter_n)
+
+                values.append(amt)
         return values
 
-    def quick_view(self):
+    def quick_view(self, discounted=True):
         fig = plt.figure()
+        fig.patch.set_facecolor('#ffffff')
         ax = fig.add_subplot(1, 1, 1)
-        ax.plot(range(self.tot_qtrs), self.sigmoid_qtr, label='sigmoid')
-        ax.plot(range(self.tot_qtrs), self.linear_qtr, label='linear')
-        ax.plot(range(self.tot_qtrs), self.step_qtr, label='step')
-        ax.scatter(range(self.tot_qtrs), self.single_qtr, label='single')
+        x_labels = quarter_labels = ['Q' + str(q) for q in range(1, self.tot_qtrs + 1)]
+        ax.plot(x_labels, self.sigmoid_qtr(discounted=discounted), label='sigmoid')
+        ax.plot(x_labels, self.linear_qtr(discounted=discounted), label='linear')
+        ax.plot(x_labels, self.step_qtr(discounted=discounted), label='step')
+        ax.scatter(x_labels, self.single_qtr(discounted=discounted), label='single')
+        # mark key axis positions for start value, delay, ramp, max value, etc
+        ax.axvline(x=self.delay_qtrs, color='black', linestyle='--', linewidth=2)
+        ax.axvline(x=self.scale_up_qtrs + self.delay_qtrs, color='black', linestyle='--', linewidth=2)
+        ax.axvline(x=self.delay_qtrs + self.scale_up_qtrs / 2, color='b', linestyle='--', linewidth=1)
+        ax.axhline(y=self.start_amt, color='black', linestyle='--', linewidth=2)
+        ax.axhline(y=self.start_amt + (self.max_amt - self.start_amt) / 2, color='b', linestyle='--', linewidth=1)
+        ax.axhline(y=self.max_amt, color='black', linestyle='--', linewidth=2)
         ax.legend(loc='upper left')
         ax.grid(True)
     
@@ -234,6 +250,7 @@ class PortfolioSheetRow(SmartsheetRow):
         # This allows us to "fail fast" when a row we want to parse doesn't have the data we want
         cells = row['cells']
         include = cells[PortfolioSheetRow.CELL_04.index].get('value', None)
+        self.amt_unit_conversion = 10**6 # covert from millions to dollars
         self.project_code = cells[PortfolioSheetRow.CELL_05.index].get('value', None)
         self.include_in_model = True if include == "Yes" else False
         
@@ -262,7 +279,14 @@ class PortfolioSheetRow(SmartsheetRow):
     def _is_cost(val):
         return val.lower() == 'cost'
 
-    
+    def _max_amt(self, val):
+        """Annual value to numer of periods in a year"""
+        return (val * self.amt_unit_conversion) / 4
+
+    def _start_value(self, val):
+        return (val * self.amt_unit_conversion) / 4
+
+
 def debug_row(row_num, sheet):
     """Very quickly see how the parser parses and outputs any single row"""
     row = sheet.rows[row_num - 1]
