@@ -8,12 +8,15 @@ from collections import namedtuple
 Cell = namedtuple('Cell', ['index', 'name', 'required'])
 
 
+# TODO: incorporate python traitlets for type checking
 class SmartsheetRow():
-    """Reusable Smartsheet class for parsing a row. To use, define a child class which contains
+    """
+    Reusable Smartsheet class for parsing a row. To use, define a child class which contains
     class attributes with a namedtuple defining each cell that should be parsed. This child class will
     inherit from this one, and automatically load and process all defined attributes.
     It is also possible to define methods to override the value when necessary. For example, divide an
-    annual value by four"""
+    annual value by four
+    """
     def __init__(self, row_dict):
         self.row_dict = row_dict
         self.cells = row_dict['cells']
@@ -28,11 +31,11 @@ class SmartsheetRow():
             unmodified = self._get_cell(cell_def)
             value = modifier(unmodified) if unmodified is not None else None
             setattr(self, cell_def.name, value)
-        
+    
     @staticmethod
     def _identity(x):
         return x
-        
+
     def _get_cell(self, cell_descriptor):
         """Will try to grab the cell regardless, if it is required, an error will be logged"""
         try:
