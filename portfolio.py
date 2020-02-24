@@ -6,10 +6,36 @@ import matplotlib.pyplot as plt
 
 from utils import Cell, SmartsheetRow
 
+
 def discount(val, discount_rate, period_n):
     return val / ((1 + discount_rate) ** period_n)
 
-class CashFlow():
+
+class CashFlowBase():
+    """Ensure all children implement the following methods"""
+
+    @property
+    def non_discounted_qtr(self):
+        raise NotImplementedError
+        
+    @property
+    def discounted_qtr(self):
+        raise NotImplementedError
+        
+    @property
+    def non_discounted_dg_qtr(self):
+        raise NotImplementedError
+        
+    @property
+    def discounted_dg_qtr(self):
+        raise NotImplementedError
+
+    @property
+    def to_json(self):
+        raise NotImplementedError
+
+
+class CashFlow(CashFlowBase):
     """Generate a cash flow profile based on key assumptions
     
     Args:
@@ -212,6 +238,48 @@ class CashFlow():
         }
 
 
+class FTECashFlow(CashFlowBase):
+    def __init__(self, discount_rate, fte_per_period, fte_period_cost, fte_y1, fte_y2, fte_y3, name):
+        self.name = name
+        self.discount_rate = discount_rate
+        self.fte_per_period = fte_per_period
+        self.fte_period_cost = fte_period_cost
+        self.fte_y1 = fte_y1
+        self.fte_y2 = fte_y2
+        self.fte_y3 = fte_y3
+
+    @property
+    def discounted_qtr(self):
+        return [
+            discount(
+                self.fte_period_cost * period_fte,
+                self.discount_rate,
+                period
+            ) for period, period_fte in enumerate(self.fte_per_period)
+        ]
+
+    @property
+    def non_discounted_qtr(self):
+        return [self.fte_period_cost * period_fte for period_fte in self.fte_per_period]
+
+    @property
+    def non_discounted_dg_qtr(self):
+        return [0 for _ in range(12)]
+    
+    @property
+    def discounted_dg_qtr(self):
+        return [0 for _ in range(12)]
+    
+    def to_json(self):
+        return {
+            "name": self.name,
+            "discount_rate": self.discount_rate,
+            "fte_y1": self.fte_y1,
+            "fte_y2": self.fte_y2,
+            "fte_y3": self.fte_y3
+        }
+    
+    
 def combine_flows(flows, attribute):
     values = map(lambda cf: getattr(cf, attribute), flows)
     aggregated_values = [sum(values) for values in zip(*values)]
@@ -224,42 +292,43 @@ class PortfolioSheetRow(SmartsheetRow):
        
        Any methods defined with the same "name" as the attribute preceeded by an underscore
        will apploy that function to the attribute as a clean way to modify the value if necessary.
-       """
+    """
     CELL_00 = Cell(0, 'name', True)
-    CELL_01 = Cell(1, 'fte', False)
-    CELL_02 = Cell(2, 'fte_unallocated', False)
-    CELL_03 = Cell(3, 'fte_other', False)
-    CELL_04 = Cell(4, 'include_in_model', True)
-    CELL_05 = Cell(5, 'project_code', True)
-    CELL_06 = Cell(6, 'annual_revenue', False)
-    CELL_07 = Cell(7, 'gross_profit_perc', False)
-    CELL_08 = Cell(8, 'attribution_perc', False)
-    CELL_09 = Cell(9, 'is_cost', True)
-    CELL_10 = Cell(10, 'function', True)
-    CELL_11 = Cell(11, 'discount_rate', True)
-    CELL_12 = Cell(12, 'start_value', True)
-    CELL_13 = Cell(13, 'delay_qtrs', True)
-    CELL_14 = Cell(14, 'max_amt', True)
-    CELL_15 = Cell(15, 'scale_up_qtrs', True)
-    CELL_16 = Cell(16, 'max_plants', False)
-    CELL_17 = Cell(17, 'digital_gallons', True)
-    CELL_16 = Cell(18, 'comments', False)
-    
+    CELL_01 = Cell(1, 'scenario', False)
+    CELL_02 = Cell(2, 'fte', False)
+    CELL_03 = Cell(3, 'fte_unallocated', False)
+    CELL_04 = Cell(4, 'fte_other', False)
+    CELL_05 = Cell(5, 'fte_y1', False)
+    CELL_06 = Cell(6, 'fte_y2', False)
+    CELL_07 = Cell(7, 'fte_y3', False)
+    CELL_08 = Cell(8, 'include_in_model', True)
+    CELL_09 = Cell(9, 'project_code', True)
+    CELL_10 = Cell(10, 'annual_revenue', False)
+    CELL_11 = Cell(11, 'gross_profit_perc', False)
+    CELL_12 = Cell(12, 'attribution_perc', False)
+    CELL_13 = Cell(13, 'is_cost', True)
+    CELL_14 = Cell(14, 'function', True)
+    CELL_15 = Cell(15, 'discount_rate', True)
+    CELL_16 = Cell(16, 'start_value', True)
+    CELL_17 = Cell(17, 'delay_qtrs', True)
+    CELL_18 = Cell(18, 'max_amt', True)
+    CELL_19 = Cell(19, 'scale_up_qtrs', True)
+    CELL_20 = Cell(20, 'max_plants', False)
+    CELL_21 = Cell(21, 'digital_gallons', True)
+    CELL_22 = Cell(22, 'comments', False)
+
     def __init__(self, row):
-        # Extra logic is used to decide if row should be processed at all
-        # This allows us to "fail fast" when a row we want to parse doesn't have the data we want
-        cells = row['cells']
-        include = cells[PortfolioSheetRow.CELL_04.index].get('value', None)
         self.amt_unit_conversion = 10**6 # covert from millions to dollars
-        self.project_code = cells[PortfolioSheetRow.CELL_05.index].get('value', None)
-        self.include_in_model = True if include == "Yes" else False
+        self.periods_in_year = 4
+        super().__init__(row)
         
-        if self.include_in_model and self.project_code:
-            super().__init__(row)
+    def _discount_rate(self, val):
+        return val / self.periods_in_year
         
     @staticmethod
     def _function(val):
         text = val.strip().lower()
+        # TODO: replace returns with FUNCTION.SIGMOID type class attributes
         if text == 'continuous' or text == 'step':
             return 'step'
         elif text == 'single pmt.':
@@ -268,6 +337,8 @@ class PortfolioSheetRow(SmartsheetRow):
             return 'sigmoid'
         elif text == 'linear':
             return 'linear'
+        elif text == 'multi-step (yr)':
+            raise Exception('Should be using PortfolioFTEParser, there is a bug in code')
         else:
             raise Exception(f'Unknown profile type: {val}')
     
@@ -280,22 +351,47 @@ class PortfolioSheetRow(SmartsheetRow):
         return val.lower() == 'cost'
 
     def _max_amt(self, val):
-        """Annual value to numer of periods in a year"""
         return (val * self.amt_unit_conversion) / 4
 
     def _start_value(self, val):
         return (val * self.amt_unit_conversion) / 4
 
 
-def debug_row(row_num, sheet):
+class PortfolioFTEParser(SmartsheetRow):
+    CELL_00 = Cell(0, 'name', True)
+    CELL_05 = Cell(5, 'fte_y1', True)
+    CELL_06 = Cell(6, 'fte_y2', True)
+    CELL_07 = Cell(7, 'fte_y3', True)
+    CELL_09 = Cell(9, 'project_code', True)
+    CELL_15 = Cell(15, 'discount_rate', True)
+
+    def __init__(self, row, periods_in_year=4):
+        self.amt_unit_conversion = 10**6 # covert from millions to dollars
+        self.periods_in_year = periods_in_year
+        super().__init__(row)
+        fte_year_to_period = lambda x: x / 4
+        self.fte_per_period = [fte_year_to_period(self.fte_y1) for _ in range(self.periods_in_year)] + \
+                          [fte_year_to_period(self.fte_y2) for _ in range(self.periods_in_year)] + \
+                          [fte_year_to_period(self.fte_y3) for _ in range(self.periods_in_year)]
+
+    def _fte_y1(self, val):
+        return val * self.amt_unit_conversion
+    
+    def _fte_y2(self, val):
+        return val * self.amt_unit_conversion
+    
+    def _fte_y3(self, val):
+        return val * self.amt_unit_conversion
+
+    
+def debug_row(row_num, sheet, cb=None):
     """Very quickly see how the parser parses and outputs any single row"""
     row = sheet.rows[row_num - 1]
-    r = PortfolioSheetRow(row.to_dict())
-    blacklisted = [
-        '__', 'cell_defs', 'CELL', 'cells', 'sheet_row', '_get_cell',
-        '_identity', '_profile_type', 'row_number', '_include'
-    ]
-    for a in dir(r):
-        if any([s in a for s in blacklisted]):
-            continue
-        print(a + '\t\t\t' + str(getattr(r, a)))
+    print('--------------------------------------')
+    r = PortfolioFTEParser(row.to_dict())
+    print('--------------------------------------')
+    desc_list = [f'{i} - {cell}' for i, cell in enumerate(row.to_dict()['cells'])]
+    for line in desc_list:
+        print(line)
+    print('--------------------------------------')
+    return r
