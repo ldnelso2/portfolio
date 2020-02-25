@@ -239,19 +239,22 @@ class CashFlow(CashFlowBase):
 
 
 class FTECashFlow(CashFlowBase):
-    def __init__(self, discount_rate, fte_per_period, fte_period_cost, fte_y1, fte_y2, fte_y3, name):
+    def __init__(self, discount_rate, fte_per_period, fte_period_cost, fte_y1, fte_y2, fte_y3, name, flow_id=uuid.uuid4()):
         self.name = name
+        self.id = flow_id
         self.discount_rate = discount_rate
         self.fte_per_period = fte_per_period
         self.fte_period_cost = fte_period_cost
         self.fte_y1 = fte_y1
         self.fte_y2 = fte_y2
         self.fte_y3 = fte_y3
+        self.is_cost = True
+        self.multiplier = -1 if self.is_cost else 1
 
     @property
     def discounted_qtr(self):
         return [
-            discount(
+            self.multiplier * discount(
                 self.fte_period_cost * period_fte,
                 self.discount_rate,
                 period
@@ -260,7 +263,7 @@ class FTECashFlow(CashFlowBase):
 
     @property
     def non_discounted_qtr(self):
-        return [self.fte_period_cost * period_fte for period_fte in self.fte_per_period]
+        return [self.multiplier * self.fte_period_cost * period_fte for period_fte in self.fte_per_period]
 
     @property
     def non_discounted_dg_qtr(self):
@@ -276,7 +279,8 @@ class FTECashFlow(CashFlowBase):
             "discount_rate": self.discount_rate,
             "fte_y1": self.fte_y1,
             "fte_y2": self.fte_y2,
-            "fte_y3": self.fte_y3
+            "fte_y3": self.fte_y3,
+            "flow_id": str(self.id)
         }
     
     
@@ -323,6 +327,7 @@ class PortfolioSheetRow(SmartsheetRow):
         super().__init__(row)
         
     def _discount_rate(self, val):
+        """By convention, discount rates are expressed in annualized terms. Convert to period"""
         return val / self.periods_in_year
         
     @staticmethod
@@ -369,17 +374,20 @@ class PortfolioFTEParser(SmartsheetRow):
         self.amt_unit_conversion = 10**6 # covert from millions to dollars
         self.periods_in_year = periods_in_year
         super().__init__(row)
-        fte_year_to_period = lambda x: x / 4
-        self.fte_per_period = [fte_year_to_period(self.fte_y1) for _ in range(self.periods_in_year)] + \
-                          [fte_year_to_period(self.fte_y2) for _ in range(self.periods_in_year)] + \
-                          [fte_year_to_period(self.fte_y3) for _ in range(self.periods_in_year)]
+        self.fte_per_period = [self.fte_y1 for _ in range(self.periods_in_year)] + \
+                          [self.fte_y2 for _ in range(self.periods_in_year)] + \
+                          [self.fte_y3 for _ in range(self.periods_in_year)]
+        
+    def _discount_rate(self, val):
+        """By convention, discount rates are expressed in annualized terms. Convert to period"""
+        return val / self.periods_in_year
 
     def _fte_y1(self, val):
         return val * self.amt_unit_conversion
     
     def _fte_y2(self, val):
         return val * self.amt_unit_conversion
-    
+
     def _fte_y3(self, val):
         return val * self.amt_unit_conversion
 
