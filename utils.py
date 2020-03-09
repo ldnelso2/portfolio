@@ -73,6 +73,31 @@ def get_smartsheet_cell(row, col, sheet, attribute=None):
     except AttributeError:
         raise Exception(f'<{attribute}> does not exist in row')
 
+
+def scan_rows_for_start_stop(sheet, string, as_index=True):
+    """Get the starting and stop values for a given string. E.g. "Start Global Vars" to "End Global Vars"
+    
+    Args:
+        sheet (smartsheet object)
+        string (str): The string (excluding start/stop) which function will scan the rows for
+        as_index (boolean): if the returned starting values should be the actual row numbers or their index
+    """
+    COLUMN_INDEX = 0
+    offset = 0 if as_index else 1
+    start = None
+    end = None
+    for row_index, row in enumerate(sheet.rows):
+        cell_value = row.to_dict()['cells'][0].get('value', '').strip().lower()
+        col_string = ' '.join(cell_value.split(' ')[1:])
+        if col_string == string.lower():
+            if start is None:
+                start = row_index + 1 # +1 to not include the "start" row
+                continue
+            end = row_index
+            return start + offset, end + offset
+    raise Exception(f'could not find rows that started and ended with <{string}>')
+
+
 def _clamp(val, minimum=0, maximum=255):
     if val < minimum:
         return int(minimum)
