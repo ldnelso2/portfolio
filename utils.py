@@ -82,10 +82,8 @@ def scan_rows_for_start_stop(sheet, string, as_index=True):
         string (str): The string (excluding start/stop) which function will scan the rows for
         as_index (boolean): if the returned starting values should be the actual row numbers or their index
     """
-    COLUMN_INDEX = 0
     offset = 0 if as_index else 1
     start = None
-    end = None
     for row_index, row in enumerate(sheet.rows):
         cell_value = row.to_dict()['cells'][0].get('value', '').strip().lower()
         col_string = ' '.join(cell_value.split(' ')[1:])
