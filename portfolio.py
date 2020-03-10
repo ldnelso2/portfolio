@@ -3,6 +3,7 @@ from functools import wraps
 import math
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from utils import Cell, SmartsheetRow
 
@@ -28,6 +29,14 @@ class CashFlowBase():
         
     @property
     def discounted_dg_qtr(self):
+        raise NotImplementedError
+
+    @property
+    def non_discounted_vc_qtr(self):
+        raise NotImplementedError
+
+    @property
+    def discounted_vc_qtr(self):
         raise NotImplementedError
 
     @property
@@ -69,7 +78,7 @@ class CashFlow(CashFlowBase):
         * function profile types should be class attributes, e.g. CashFlow.SIGMOIDs
     """
     def __init__(self, delay_qtrs, digital_gallons, discount_rate, is_cost, max_amt, scale_up_qtrs,
-                 function, start_amt=0, name='', flow_id=uuid.uuid4(), tot_qtrs=12):
+                 function, vc_per_dg, start_amt=0, name='', flow_id=uuid.uuid4(), tot_qtrs=12):
         if scale_up_qtrs < 2: 
             raise Exception('the total number of quarters must be at least one')
 
@@ -83,8 +92,12 @@ class CashFlow(CashFlowBase):
         self.name = name
         self.scale_up_qtrs = scale_up_qtrs
         self.start_amt = start_amt
+        self.vc_per_dg = vc_per_dg
         self.tot_qtrs = tot_qtrs  # TODO: rename to "period"
-        
+        self.periods = list(range(1, tot_qtrs + 1))
+        self.periods_index = list(range(tot_qtrs))
+        self.periods_labels = ['Q' + str(q) for q in range(1, self.tot_qtrs + 1)]
+
     def _sigmoid(self, x, max_amt, start_amt):
         """
         We define y at 95% max at end of delay and scale up period 
@@ -118,7 +131,7 @@ class CashFlow(CashFlowBase):
  
     def _calculate_qtr(self, f, discounted):
         values = []
-        for quarter_n in range(0, self.tot_qtrs):
+        for quarter_n in self.periods_index:
             if quarter_n < self.delay_qtrs:
                 values.append(0)
             else:
@@ -134,7 +147,7 @@ class CashFlow(CashFlowBase):
     def _calculate_dg_qtr(self, f, discounted):
         """calculates digital gallons per quarter"""
         values = []
-        for quarter_n in range(0, self.tot_qtrs):
+        for quarter_n in self.periods_index:
             if quarter_n < self.delay_qtrs:
                 values.append(0)
             else:
@@ -146,15 +159,31 @@ class CashFlow(CashFlowBase):
                 values.append(amt)
         return values
 
+    def _calculate_vc_qtr(self, discounted):
+        """calculate the variable cost based on digital gallons
+        """
+        unit_multiplier = 10**6  # put in dollars
+        dg_to_variable_cost = lambda v: v * unit_multiplier * self.vc_per_dg
+        variable_cost = [0]  # No variable cost at Q0
+        cf_attribute = 'discounted_dg_qtr' if discounted else 'non_discounted_dg_qtr'
+        dg_cost = list(map(dg_to_variable_cost, getattr(self, cf_attribute)))
+
+        # iterable is of form [(0, (0, 1)), (1, (1, 2)), (n, (n + 1))]
+        for index, step in list(enumerate(zip(self.periods_index, self.periods)))[:-1]:
+            # integraing using trapezoidal riemann sum
+            step_vc = np.trapz([dg_cost[index], dg_cost[index + 1]], step)
+            variable_cost.append(step_vc)
+
+        return variable_cost
+
     def quick_view(self, discounted=True):
         fig = plt.figure()
         fig.patch.set_facecolor('#ffffff')
         ax = fig.add_subplot(1, 1, 1)
-        x_labels = quarter_labels = ['Q' + str(q) for q in range(1, self.tot_qtrs + 1)]
-        ax.plot(x_labels, self.sigmoid_qtr(discounted=discounted), label='sigmoid')
-        ax.plot(x_labels, self.linear_qtr(discounted=discounted), label='linear')
-        ax.plot(x_labels, self.step_qtr(discounted=discounted), label='step')
-        ax.scatter(x_labels, self.single_qtr(discounted=discounted), label='single')
+        ax.plot(self.periods_labels, self.sigmoid_qtr(discounted=discounted), label='sigmoid')
+        ax.plot(self.periods_labels, self.linear_qtr(discounted=discounted), label='linear')
+        ax.plot(self.periods_labels, self.step_qtr(discounted=discounted), label='step')
+        ax.scatter(self.periods_labels, self.single_qtr(discounted=discounted), label='single')
         # mark key axis positions for start value, delay, ramp, max value, etc
         ax.axvline(x=self.delay_qtrs, color='black', linestyle='--', linewidth=2)
         ax.axvline(x=self.scale_up_qtrs + self.delay_qtrs, color='black', linestyle='--', linewidth=2)
@@ -189,6 +218,14 @@ class CashFlow(CashFlowBase):
     @property
     def discounted_dg_qtr(self):
         return self._dg_qtr(True)
+
+    @property
+    def non_discounted_vc_qtr(self):
+        return self._calculate_vc_qtr(False)
+
+    @property
+    def discounted_vc_qtr(self):
+        return self._calculate_vc_qtr(True)
 
     def sigmoid_qtr(self, discounted=True):
         """returns cash flow profile with a sigmoid profile, ignoring "function" attribute"""
@@ -272,7 +309,15 @@ class FTECashFlow(CashFlowBase):
     @property
     def discounted_dg_qtr(self):
         return [0 for _ in range(12)]
-    
+
+    @property
+    def non_discounted_vc_qtr(self):
+        return [0 for _ in range(12)]
+
+    @property
+    def discounted_vc_qtr(self):
+        return [0 for _ in range(12)]
+
     def to_json(self):
         return {
             "name": self.name,
