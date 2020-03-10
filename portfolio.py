@@ -163,7 +163,7 @@ class CashFlow(CashFlowBase):
         """calculate the variable cost based on digital gallons
         """
         unit_multiplier = 10**6  # put in dollars
-        dg_to_variable_cost = lambda v: v * unit_multiplier * self.vc_per_dg
+        dg_to_variable_cost = lambda v: -1 * v * unit_multiplier * self.vc_per_dg
         variable_cost = [0]  # No variable cost at Q0
         cf_attribute = 'discounted_dg_qtr' if discounted else 'non_discounted_dg_qtr'
         dg_cost = list(map(dg_to_variable_cost, getattr(self, cf_attribute)))
