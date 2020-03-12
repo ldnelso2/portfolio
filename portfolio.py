@@ -5,7 +5,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 
-from utils import Cell, SmartsheetRow
+from utils import Cell, SmartsheetRow, get_smartsheet_col_by_id
 
 
 def discount(val, discount_rate, period_n):
@@ -336,7 +336,8 @@ def combine_flows(flows, attribute):
 
 PORTFOLIO_NAME_COL_ID = '3338344949147524'
 PORTFOLIO_SCENARIO_COL_ID = '1429874066909060'
-PORTFOLIO_FTE_TODAY_COL_ID = '5961512868177796'
+PORTFOLIO_FTE_TODAY_COL_ID = '5961512868177796'  # same col as global var values
+PORTFOLIO_GLOB_VAR_VALUE_COL_ID = '5961512868177796'  # same col as fte today
 PORTFOLIO_FTE_UNALLOC_COL_ID = '6999753029379972'
 PORTFOLIO_FTE_OTHER_COL_ID = '7414287569315716'
 PORTFOLIO_FTE_Y1_COL_ID = '2406463730673540'
@@ -462,25 +463,13 @@ class PortfolioFTEParser(SmartsheetRow):
 
 
 def scan_global_vars(sheet, name, start_row, end_row):
-    NAME_COL_INDEX = 0
-    VALUE_COL_INDEX = 2
     for sheet_row in sheet.rows[start_row:end_row]:
-        cells = sheet_row.to_dict()['cells']
-        cell_name = cells[NAME_COL_INDEX].get('value', None)
-        cell_value = cells[VALUE_COL_INDEX].get('value', None)
+        cell_name = get_smartsheet_col_by_id(sheet_row, PORTFOLIO_NAME_COL_ID).get('value', None)
+        cell_value = get_smartsheet_col_by_id(
+            sheet_row,
+            PORTFOLIO_GLOB_VAR_VALUE_COL_ID
+        ).get('value', None)
         if cell_name is not None and name.lower() == cell_name.lower():
             return cell_value
 
     raise Exception(f'Could not find a value for <{name}> in global vars from rows [{start_row}, {end_row}]')
-
-def debug_row(row_num, sheet, cb=None):
-    """Very quickly see how the parser parses and outputs any single row"""
-    row = sheet.rows[row_num - 1]
-    print('--------------------------------------')
-    r = PortfolioFTEParser(row.to_dict())
-    print('--------------------------------------')
-    desc_list = [f'{i} - {cell}' for i, cell in enumerate(row.to_dict()['cells'])]
-    for line in desc_list:
-        print(line)
-    print('--------------------------------------')
-    return r
