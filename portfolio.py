@@ -342,29 +342,29 @@ class PortfolioSheetRow(SmartsheetRow):
        Any methods defined with the same "name" as the attribute preceeded by an underscore
        will apploy that function to the attribute as a clean way to modify the value if necessary.
     """
-    CELL_00 = Cell(0, 'name', True)
-    CELL_01 = Cell(1, 'scenario', False)
-    CELL_02 = Cell(2, 'fte', False)
-    CELL_03 = Cell(3, 'fte_unallocated', False)
-    CELL_04 = Cell(4, 'fte_other', False)
-    CELL_05 = Cell(5, 'fte_y1', False)
-    CELL_06 = Cell(6, 'fte_y2', False)
-    CELL_07 = Cell(7, 'fte_y3', False)
-    CELL_08 = Cell(8, 'include_in_model', True)
-    CELL_09 = Cell(9, 'project_code', True)
-    CELL_10 = Cell(10, 'annual_revenue', False)
-    CELL_11 = Cell(11, 'gross_profit_perc', False)
-    CELL_12 = Cell(12, 'attribution_perc', False)
-    CELL_13 = Cell(13, 'is_cost', True)
-    CELL_14 = Cell(14, 'function', True)
-    CELL_15 = Cell(15, 'discount_rate', True)
-    CELL_16 = Cell(16, 'start_value', True)
-    CELL_17 = Cell(17, 'delay_qtrs', True)
-    CELL_18 = Cell(18, 'max_amt', True)
-    CELL_19 = Cell(19, 'scale_up_qtrs', True)
-    CELL_20 = Cell(20, 'max_plants', False)
-    CELL_21 = Cell(21, 'digital_gallons', True)
-    CELL_22 = Cell(22, 'comments', False)
+    CELL_00 = Cell('3338344949147524', 'name', True)
+    CELL_01 = Cell('1429874066909060', 'scenario', False)
+    CELL_02 = Cell('5961512868177796', 'fte', False)
+    CELL_03 = Cell('6999753029379972', 'fte_unallocated', False)
+    CELL_04 = Cell('7414287569315716', 'fte_other', False)
+    CELL_05 = Cell('2406463730673540', 'fte_y1', False)
+    CELL_06 = Cell('2555773973751684', 'fte_y2', False)
+    CELL_07 = Cell('7059373601122180', 'fte_y3', False)
+    CELL_08 = Cell('7043719938500484', 'include_in_model', True)
+    CELL_09 = Cell('2933137736001412', 'project_code', True)
+    CELL_10 = Cell('4029385859721092', 'annual_revenue', False)
+    CELL_11 = Cell('3248666032007044', 'gross_profit_perc', False)
+    CELL_12 = Cell('7752265659377540', 'attribution_perc', False)
+    CELL_13 = Cell('7841944576518020', 'is_cost', True)
+    CELL_14 = Cell('2212445042304900', 'function', True)
+    CELL_15 = Cell('8967844483360644', 'discount_rate', True)
+    CELL_16 = Cell('7552480960636804', 'start_value', True)
+    CELL_17 = Cell('6716044669675396', 'delay_qtrs', True)
+    CELL_18 = Cell('4464244855990148', 'max_amt', True)
+    CELL_19 = Cell('8499761767573380', 'scale_up_qtrs', True)
+    CELL_20 = Cell('3391712988030852', 'max_plants', False)
+    CELL_21 = Cell('2824668857034628', 'digital_gallons', True)
+    CELL_22 = Cell('7538661903361924', 'comments', False)
 
     def __init__(self, row):
         self.amt_unit_conversion = 10**6 # covert from millions to dollars
@@ -408,12 +408,12 @@ class PortfolioSheetRow(SmartsheetRow):
 
 
 class PortfolioFTEParser(SmartsheetRow):
-    CELL_00 = Cell(0, 'name', True)
-    CELL_05 = Cell(5, 'fte_y1', True)
-    CELL_06 = Cell(6, 'fte_y2', True)
-    CELL_07 = Cell(7, 'fte_y3', True)
-    CELL_09 = Cell(9, 'project_code', True)
-    CELL_15 = Cell(15, 'discount_rate', True)
+    CELL_00 = Cell('3338344949147524', 'name', True)
+    CELL_05 = Cell('2406463730673540', 'fte_y1', True)
+    CELL_06 = Cell('2555773973751684', 'fte_y2', True)
+    CELL_07 = Cell('7059373601122180', 'fte_y3', True)
+    CELL_09 = Cell('2933137736001412', 'project_code', True)
+    CELL_15 = Cell('8967844483360644', 'discount_rate', True)
 
     def __init__(self, row, periods_in_year=4):
         self.amt_unit_conversion = 10**6 # covert from millions to dollars
@@ -437,7 +437,7 @@ class PortfolioFTEParser(SmartsheetRow):
         return val * self.amt_unit_conversion
 
 
-def scan_global_vars(name, start_row, end_row):
+def scan_global_vars(sheet, name, start_row, end_row):
     NAME_COL_INDEX = 0
     VALUE_COL_INDEX = 2
     for sheet_row in sheet.rows[start_row:end_row]:
