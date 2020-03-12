@@ -436,7 +436,19 @@ class PortfolioFTEParser(SmartsheetRow):
     def _fte_y3(self, val):
         return val * self.amt_unit_conversion
 
-    
+
+def scan_global_vars(name, start_row, end_row):
+    NAME_COL_INDEX = 0
+    VALUE_COL_INDEX = 2
+    for sheet_row in sheet.rows[start_row:end_row]:
+        cells = sheet_row.to_dict()['cells']
+        cell_name = cells[NAME_COL_INDEX].get('value', None)
+        cell_value = cells[VALUE_COL_INDEX].get('value', None)
+        if cell_name is not None and name.lower() == cell_name.lower():
+            return cell_value
+
+    raise Exception(f'Could not find a value for <{name}> in global vars from rows [{start_row}, {end_row}]')
+
 def debug_row(row_num, sheet, cb=None):
     """Very quickly see how the parser parses and outputs any single row"""
     row = sheet.rows[row_num - 1]
