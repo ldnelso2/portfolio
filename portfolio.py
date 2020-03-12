@@ -334,6 +334,30 @@ def combine_flows(flows, attribute):
     aggregated_values = [sum(values) for values in zip(*values)]
     return aggregated_values
 
+PORTFOLIO_NAME_COL_ID = '3338344949147524'
+PORTFOLIO_SCENARIO_COL_ID = '1429874066909060'
+PORTFOLIO_FTE_TODAY_COL_ID = '5961512868177796'
+PORTFOLIO_FTE_UNALLOC_COL_ID = '6999753029379972'
+PORTFOLIO_FTE_OTHER_COL_ID = '7414287569315716'
+PORTFOLIO_FTE_Y1_COL_ID = '2406463730673540'
+PORTFOLIO_FTE_Y2_COL_ID = '2555773973751684'
+PORTFOLIO_FTE_Y3_COL_ID = '7059373601122180'
+PORTFOLIO_INCLUDE_COL_ID = '7043719938500484'
+PORTFOLIO_PROJ_CODE_COL_ID = '2933137736001412' 
+PORTFOLIO_ANN_REV_COL_ID = '4029385859721092'
+PORTFOLIO_GP_PRC_COL_ID = '3248666032007044'
+PORTFOLIO_ATTR_PRC_COL_ID = '7752265659377540'
+PORTFOLIO_IS_COST_COL_ID = '7841944576518020'
+PORTFOLIO_FUNC_COL_ID = '2212445042304900'
+PORTFOLIO_DR_COL_ID = '8967844483360644'
+PORTFOLIO_START_AMT_COL_ID = '7552480960636804'
+PORTFOLIO_DELAY_PERIOD_COL_ID = '6716044669675396'
+PORTFOLIO_MAX_AMT_COL_ID = '4464244855990148'
+PORTFOLIO_SCALE_PERIOD_COL_ID = '8499761767573380'
+PORTFOLIO_MAX_PLANTS_COL_ID = '3391712988030852'
+PORTFOLIO_DG_COL_ID = '2824668857034628'
+PORTFOLIO_COMMENTS_COL_ID = '7538661903361924'
+
 
 class PortfolioSheetRow(SmartsheetRow):
     """All cells that are desired MUST have a class attribute defined where:
@@ -342,29 +366,29 @@ class PortfolioSheetRow(SmartsheetRow):
        Any methods defined with the same "name" as the attribute preceeded by an underscore
        will apploy that function to the attribute as a clean way to modify the value if necessary.
     """
-    CELL_00 = Cell('3338344949147524', 'name', True)
-    CELL_01 = Cell('1429874066909060', 'scenario', False)
-    CELL_02 = Cell('5961512868177796', 'fte', False)
-    CELL_03 = Cell('6999753029379972', 'fte_unallocated', False)
-    CELL_04 = Cell('7414287569315716', 'fte_other', False)
-    CELL_05 = Cell('2406463730673540', 'fte_y1', False)
-    CELL_06 = Cell('2555773973751684', 'fte_y2', False)
-    CELL_07 = Cell('7059373601122180', 'fte_y3', False)
-    CELL_08 = Cell('7043719938500484', 'include_in_model', True)
-    CELL_09 = Cell('2933137736001412', 'project_code', True)
-    CELL_10 = Cell('4029385859721092', 'annual_revenue', False)
-    CELL_11 = Cell('3248666032007044', 'gross_profit_perc', False)
-    CELL_12 = Cell('7752265659377540', 'attribution_perc', False)
-    CELL_13 = Cell('7841944576518020', 'is_cost', True)
-    CELL_14 = Cell('2212445042304900', 'function', True)
-    CELL_15 = Cell('8967844483360644', 'discount_rate', True)
-    CELL_16 = Cell('7552480960636804', 'start_value', True)
-    CELL_17 = Cell('6716044669675396', 'delay_qtrs', True)
-    CELL_18 = Cell('4464244855990148', 'max_amt', True)
-    CELL_19 = Cell('8499761767573380', 'scale_up_qtrs', True)
-    CELL_20 = Cell('3391712988030852', 'max_plants', False)
-    CELL_21 = Cell('2824668857034628', 'digital_gallons', True)
-    CELL_22 = Cell('7538661903361924', 'comments', False)
+    CELL_00 = Cell(PORTFOLIO_NAME_COL_ID, 'name', True)
+    CELL_01 = Cell(PORTFOLIO_SCENARIO_COL_ID, 'scenario', False)
+    CELL_02 = Cell(PORTFOLIO_FTE_TODAY_COL_ID, 'fte_today', False)
+    CELL_03 = Cell(PORTFOLIO_FTE_UNALLOC_COL_ID, 'fte_unallocated', False)
+    CELL_04 = Cell(PORTFOLIO_FTE_OTHER_COL_ID, 'fte_other', False)
+    CELL_05 = Cell(PORTFOLIO_FTE_Y1_COL_ID, 'fte_y1', False)
+    CELL_06 = Cell(PORTFOLIO_FTE_Y2_COL_ID, 'fte_y2', False)
+    CELL_07 = Cell(PORTFOLIO_FTE_Y3_COL_ID, 'fte_y3', False)
+    CELL_08 = Cell(PORTFOLIO_INCLUDE_COL_ID, 'include_in_model', True)
+    CELL_09 = Cell(PORTFOLIO_PROJ_CODE_COL_ID, 'project_code', True)
+    CELL_10 = Cell(PORTFOLIO_ANN_REV_COL_ID, 'annual_revenue', False)
+    CELL_11 = Cell(PORTFOLIO_GP_PRC_COL_ID, 'gross_profit_perc', False)
+    CELL_12 = Cell(PORTFOLIO_ATTR_PRC_COL_ID, 'attribution_perc', False)
+    CELL_13 = Cell(PORTFOLIO_IS_COST_COL_ID, 'is_cost', True)
+    CELL_14 = Cell(PORTFOLIO_FUNC_COL_ID, 'function', True)
+    CELL_15 = Cell(PORTFOLIO_DR_COL_ID, 'discount_rate', True)
+    CELL_16 = Cell(PORTFOLIO_START_AMT_COL_ID, 'start_value', True)
+    CELL_17 = Cell(PORTFOLIO_DELAY_PERIOD_COL_ID, 'delay_qtrs', True)
+    CELL_18 = Cell(PORTFOLIO_MAX_AMT_COL_ID, 'max_amt', True)
+    CELL_19 = Cell(PORTFOLIO_SCALE_PERIOD_COL_ID, 'scale_up_qtrs', True)
+    CELL_20 = Cell(PORTFOLIO_MAX_PLANTS_COL_ID, 'max_plants', False)
+    CELL_21 = Cell(PORTFOLIO_DG_COL_ID, 'digital_gallons', True)
+    CELL_22 = Cell(PORTFOLIO_COMMENTS_COL_ID, 'comments', False)
 
     def __init__(self, row):
         self.amt_unit_conversion = 10**6 # covert from millions to dollars
@@ -408,12 +432,12 @@ class PortfolioSheetRow(SmartsheetRow):
 
 
 class PortfolioFTEParser(SmartsheetRow):
-    CELL_00 = Cell('3338344949147524', 'name', True)
-    CELL_05 = Cell('2406463730673540', 'fte_y1', True)
-    CELL_06 = Cell('2555773973751684', 'fte_y2', True)
-    CELL_07 = Cell('7059373601122180', 'fte_y3', True)
-    CELL_09 = Cell('2933137736001412', 'project_code', True)
-    CELL_15 = Cell('8967844483360644', 'discount_rate', True)
+    CELL_00 = Cell(PORTFOLIO_NAME_COL_ID, 'name', True)
+    CELL_05 = Cell(PORTFOLIO_FTE_Y1_COL_ID, 'fte_y1', True)
+    CELL_06 = Cell(PORTFOLIO_FTE_Y2_COL_ID, 'fte_y2', True)
+    CELL_07 = Cell(PORTFOLIO_FTE_Y3_COL_ID, 'fte_y3', True)
+    CELL_09 = Cell(PORTFOLIO_PROJ_CODE_COL_ID, 'project_code', True)
+    CELL_15 = Cell(PORTFOLIO_DR_COL_ID, 'discount_rate', True)
 
     def __init__(self, row, periods_in_year=4):
         self.amt_unit_conversion = 10**6 # covert from millions to dollars
