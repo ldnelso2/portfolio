@@ -5,7 +5,7 @@ from collections import namedtuple
 #
 # Parsing immediately, and with intent of what must be there prevents
 # a slew of boundary type errors or runtime ones.
-Cell = namedtuple('Cell', ['index', 'name', 'required'])
+Cell = namedtuple('Cell', ['col_id', 'name', 'required'])
 
 
 # TODO: incorporate python traitlets for type checking
@@ -19,7 +19,7 @@ class SmartsheetRow():
     """
     def __init__(self, row_dict):
         self.row_dict = row_dict
-        self.cells = row_dict['cells']
+        self.cells_dct = { str(cell['columnId']): cell for cell in row_dict['cells'] }
         self.row_number = row_dict['rowNumber']
         # essentially grab the class attributes
         self.cell_defs = [getattr(self, attr) for attr in dir(self) if 'CELL_' in attr]
@@ -40,17 +40,23 @@ class SmartsheetRow():
         """Will try to grab the cell regardless, if it is required, an error will be logged"""
         try:
             if cell_descriptor.required:
-                cell_value = self.cells[cell_descriptor.index]['value']
-                return cell_value
+                return self.cells_dct[cell_descriptor.col_id]['value']
             else:
-                cell = self.cells[cell_descriptor.index]
-                return cell.get('value', None)
+                return self.cells_dct[cell_descriptor.col_id].get('value', None)
         except:
             raise Exception(f'Failed to process Row <{self.row_number}>. Missing {cell_descriptor.name}')
 
     def to_json(self):
         cell_defs = [getattr(self, attr) for attr in dir(self) if 'CELL_' in attr]
         return { cd.name: getattr(self, cd.name) for cd in cell_defs }
+
+
+def get_smartsheet_col_by_id(sheet_row, col_id):
+    row_dct = { str(cell['columnId']): cell for cell in sheet_row.to_dict()['cells'] }
+    try:
+        return row_dct[col_id]
+    except KeyError:
+        raise Exception(f'column with ID <{col_id}> does not exist in provided smartsheet row')
 
 
 def get_smartsheet_cell(row, col, sheet, attribute=None):
@@ -72,6 +78,29 @@ def get_smartsheet_cell(row, col, sheet, attribute=None):
         return None
     except AttributeError:
         raise Exception(f'<{attribute}> does not exist in row')
+
+
+def scan_rows_for_start_stop(sheet, string, as_index=True):
+    """Get the starting and stop values for a given string. E.g. "Start Global Vars" to "End Global Vars"
+    
+    Args:
+        sheet (smartsheet object)
+        string (str): The string (excluding start/stop) which function will scan the rows for
+        as_index (boolean): if the returned starting values should be the actual row numbers or their index
+    """
+    offset = 0 if as_index else 1
+    start = None
+    for row_index, row in enumerate(sheet.rows):
+        cell_value = row.to_dict()['cells'][0].get('value', '').strip().lower()
+        col_string = ' '.join(cell_value.split(' ')[1:])
+        if col_string == string.lower():
+            if start is None:
+                start = row_index + 1 # +1 to not include the "start" row
+                continue
+            end = row_index
+            return start + offset, end + offset
+    raise Exception(f'could not find rows that started and ended with <{string}>')
+
 
 def _clamp(val, minimum=0, maximum=255):
     if val < minimum:

@@ -3,8 +3,9 @@ from functools import wraps
 import math
 
 import matplotlib.pyplot as plt
+import numpy as np
 
-from utils import Cell, SmartsheetRow
+from utils import Cell, SmartsheetRow, get_smartsheet_col_by_id
 
 
 def discount(val, discount_rate, period_n):
@@ -28,6 +29,14 @@ class CashFlowBase():
         
     @property
     def discounted_dg_qtr(self):
+        raise NotImplementedError
+
+    @property
+    def non_discounted_vc_qtr(self):
+        raise NotImplementedError
+
+    @property
+    def discounted_vc_qtr(self):
         raise NotImplementedError
 
     @property
@@ -69,7 +78,7 @@ class CashFlow(CashFlowBase):
         * function profile types should be class attributes, e.g. CashFlow.SIGMOIDs
     """
     def __init__(self, delay_qtrs, digital_gallons, discount_rate, is_cost, max_amt, scale_up_qtrs,
-                 function, start_amt=0, name='', flow_id=uuid.uuid4(), tot_qtrs=12):
+                 function, vc_per_dg, start_amt=0, name='', flow_id=uuid.uuid4(), tot_qtrs=12):
         if scale_up_qtrs < 2: 
             raise Exception('the total number of quarters must be at least one')
 
@@ -83,8 +92,12 @@ class CashFlow(CashFlowBase):
         self.name = name
         self.scale_up_qtrs = scale_up_qtrs
         self.start_amt = start_amt
+        self.vc_per_dg = vc_per_dg
         self.tot_qtrs = tot_qtrs  # TODO: rename to "period"
-        
+        self.periods = list(range(1, tot_qtrs + 1))
+        self.periods_index = list(range(tot_qtrs))
+        self.periods_labels = ['Q' + str(q) for q in range(1, self.tot_qtrs + 1)]
+
     def _sigmoid(self, x, max_amt, start_amt):
         """
         We define y at 95% max at end of delay and scale up period 
@@ -118,7 +131,7 @@ class CashFlow(CashFlowBase):
  
     def _calculate_qtr(self, f, discounted):
         values = []
-        for quarter_n in range(0, self.tot_qtrs):
+        for quarter_n in self.periods_index:
             if quarter_n < self.delay_qtrs:
                 values.append(0)
             else:
@@ -134,7 +147,7 @@ class CashFlow(CashFlowBase):
     def _calculate_dg_qtr(self, f, discounted):
         """calculates digital gallons per quarter"""
         values = []
-        for quarter_n in range(0, self.tot_qtrs):
+        for quarter_n in self.periods_index:
             if quarter_n < self.delay_qtrs:
                 values.append(0)
             else:
@@ -146,15 +159,31 @@ class CashFlow(CashFlowBase):
                 values.append(amt)
         return values
 
+    def _calculate_vc_qtr(self, discounted):
+        """calculate the variable cost based on digital gallons
+        """
+        unit_multiplier = 10**6  # put in dollars
+        dg_to_variable_cost = lambda v: -1 * v * unit_multiplier * self.vc_per_dg
+        variable_cost = [0]  # No variable cost at Q0
+        cf_attribute = 'discounted_dg_qtr' if discounted else 'non_discounted_dg_qtr'
+        dg_cost = list(map(dg_to_variable_cost, getattr(self, cf_attribute)))
+
+        # iterable is of form [(0, (0, 1)), (1, (1, 2)), (n, (n + 1))]
+        for index, step in list(enumerate(zip(self.periods_index, self.periods)))[:-1]:
+            # integraing using trapezoidal riemann sum
+            step_vc = np.trapz([dg_cost[index], dg_cost[index + 1]], step)
+            variable_cost.append(step_vc)
+
+        return variable_cost
+
     def quick_view(self, discounted=True):
         fig = plt.figure()
         fig.patch.set_facecolor('#ffffff')
         ax = fig.add_subplot(1, 1, 1)
-        x_labels = quarter_labels = ['Q' + str(q) for q in range(1, self.tot_qtrs + 1)]
-        ax.plot(x_labels, self.sigmoid_qtr(discounted=discounted), label='sigmoid')
-        ax.plot(x_labels, self.linear_qtr(discounted=discounted), label='linear')
-        ax.plot(x_labels, self.step_qtr(discounted=discounted), label='step')
-        ax.scatter(x_labels, self.single_qtr(discounted=discounted), label='single')
+        ax.plot(self.periods_labels, self.sigmoid_qtr(discounted=discounted), label='sigmoid')
+        ax.plot(self.periods_labels, self.linear_qtr(discounted=discounted), label='linear')
+        ax.plot(self.periods_labels, self.step_qtr(discounted=discounted), label='step')
+        ax.scatter(self.periods_labels, self.single_qtr(discounted=discounted), label='single')
         # mark key axis positions for start value, delay, ramp, max value, etc
         ax.axvline(x=self.delay_qtrs, color='black', linestyle='--', linewidth=2)
         ax.axvline(x=self.scale_up_qtrs + self.delay_qtrs, color='black', linestyle='--', linewidth=2)
@@ -189,6 +218,14 @@ class CashFlow(CashFlowBase):
     @property
     def discounted_dg_qtr(self):
         return self._dg_qtr(True)
+
+    @property
+    def non_discounted_vc_qtr(self):
+        return self._calculate_vc_qtr(False)
+
+    @property
+    def discounted_vc_qtr(self):
+        return self._calculate_vc_qtr(True)
 
     def sigmoid_qtr(self, discounted=True):
         """returns cash flow profile with a sigmoid profile, ignoring "function" attribute"""
@@ -239,19 +276,22 @@ class CashFlow(CashFlowBase):
 
 
 class FTECashFlow(CashFlowBase):
-    def __init__(self, discount_rate, fte_per_period, fte_period_cost, fte_y1, fte_y2, fte_y3, name):
+    def __init__(self, discount_rate, fte_per_period, fte_period_cost, fte_y1, fte_y2, fte_y3, name, flow_id=uuid.uuid4()):
         self.name = name
+        self.id = flow_id
         self.discount_rate = discount_rate
         self.fte_per_period = fte_per_period
         self.fte_period_cost = fte_period_cost
         self.fte_y1 = fte_y1
         self.fte_y2 = fte_y2
         self.fte_y3 = fte_y3
+        self.is_cost = True
+        self.multiplier = -1 if self.is_cost else 1
 
     @property
     def discounted_qtr(self):
         return [
-            discount(
+            self.multiplier * discount(
                 self.fte_period_cost * period_fte,
                 self.discount_rate,
                 period
@@ -260,7 +300,7 @@ class FTECashFlow(CashFlowBase):
 
     @property
     def non_discounted_qtr(self):
-        return [self.fte_period_cost * period_fte for period_fte in self.fte_per_period]
+        return [self.multiplier * self.fte_period_cost * period_fte for period_fte in self.fte_per_period]
 
     @property
     def non_discounted_dg_qtr(self):
@@ -269,14 +309,23 @@ class FTECashFlow(CashFlowBase):
     @property
     def discounted_dg_qtr(self):
         return [0 for _ in range(12)]
-    
+
+    @property
+    def non_discounted_vc_qtr(self):
+        return [0 for _ in range(12)]
+
+    @property
+    def discounted_vc_qtr(self):
+        return [0 for _ in range(12)]
+
     def to_json(self):
         return {
             "name": self.name,
             "discount_rate": self.discount_rate,
             "fte_y1": self.fte_y1,
             "fte_y2": self.fte_y2,
-            "fte_y3": self.fte_y3
+            "fte_y3": self.fte_y3,
+            "flow_id": str(self.id)
         }
     
     
@@ -284,6 +333,31 @@ def combine_flows(flows, attribute):
     values = map(lambda cf: getattr(cf, attribute), flows)
     aggregated_values = [sum(values) for values in zip(*values)]
     return aggregated_values
+
+PORTFOLIO_NAME_COL_ID = '3338344949147524'
+PORTFOLIO_SCENARIO_COL_ID = '1429874066909060'
+PORTFOLIO_FTE_TODAY_COL_ID = '5961512868177796'  # same col as global var values
+PORTFOLIO_GLOB_VAR_VALUE_COL_ID = '5961512868177796'  # same col as fte today
+PORTFOLIO_FTE_UNALLOC_COL_ID = '6999753029379972'
+PORTFOLIO_FTE_OTHER_COL_ID = '7414287569315716'
+PORTFOLIO_FTE_Y1_COL_ID = '2406463730673540'
+PORTFOLIO_FTE_Y2_COL_ID = '2555773973751684'
+PORTFOLIO_FTE_Y3_COL_ID = '7059373601122180'
+PORTFOLIO_INCLUDE_COL_ID = '7043719938500484'
+PORTFOLIO_PROJ_CODE_COL_ID = '2933137736001412' 
+PORTFOLIO_ANN_REV_COL_ID = '4029385859721092'
+PORTFOLIO_GP_PRC_COL_ID = '3248666032007044'
+PORTFOLIO_ATTR_PRC_COL_ID = '7752265659377540'
+PORTFOLIO_IS_COST_COL_ID = '7841944576518020'
+PORTFOLIO_FUNC_COL_ID = '2212445042304900'
+PORTFOLIO_DR_COL_ID = '8967844483360644'
+PORTFOLIO_START_AMT_COL_ID = '7552480960636804'
+PORTFOLIO_DELAY_PERIOD_COL_ID = '6716044669675396'
+PORTFOLIO_MAX_AMT_COL_ID = '4464244855990148'
+PORTFOLIO_SCALE_PERIOD_COL_ID = '8499761767573380'
+PORTFOLIO_MAX_PLANTS_COL_ID = '3391712988030852'
+PORTFOLIO_DG_COL_ID = '2824668857034628'
+PORTFOLIO_COMMENTS_COL_ID = '7538661903361924'
 
 
 class PortfolioSheetRow(SmartsheetRow):
@@ -293,29 +367,29 @@ class PortfolioSheetRow(SmartsheetRow):
        Any methods defined with the same "name" as the attribute preceeded by an underscore
        will apploy that function to the attribute as a clean way to modify the value if necessary.
     """
-    CELL_00 = Cell(0, 'name', True)
-    CELL_01 = Cell(1, 'scenario', False)
-    CELL_02 = Cell(2, 'fte', False)
-    CELL_03 = Cell(3, 'fte_unallocated', False)
-    CELL_04 = Cell(4, 'fte_other', False)
-    CELL_05 = Cell(5, 'fte_y1', False)
-    CELL_06 = Cell(6, 'fte_y2', False)
-    CELL_07 = Cell(7, 'fte_y3', False)
-    CELL_08 = Cell(8, 'include_in_model', True)
-    CELL_09 = Cell(9, 'project_code', True)
-    CELL_10 = Cell(10, 'annual_revenue', False)
-    CELL_11 = Cell(11, 'gross_profit_perc', False)
-    CELL_12 = Cell(12, 'attribution_perc', False)
-    CELL_13 = Cell(13, 'is_cost', True)
-    CELL_14 = Cell(14, 'function', True)
-    CELL_15 = Cell(15, 'discount_rate', True)
-    CELL_16 = Cell(16, 'start_value', True)
-    CELL_17 = Cell(17, 'delay_qtrs', True)
-    CELL_18 = Cell(18, 'max_amt', True)
-    CELL_19 = Cell(19, 'scale_up_qtrs', True)
-    CELL_20 = Cell(20, 'max_plants', False)
-    CELL_21 = Cell(21, 'digital_gallons', True)
-    CELL_22 = Cell(22, 'comments', False)
+    CELL_00 = Cell(PORTFOLIO_NAME_COL_ID, 'name', True)
+    CELL_01 = Cell(PORTFOLIO_SCENARIO_COL_ID, 'scenario', False)
+    CELL_02 = Cell(PORTFOLIO_FTE_TODAY_COL_ID, 'fte_today', False)
+    CELL_03 = Cell(PORTFOLIO_FTE_UNALLOC_COL_ID, 'fte_unallocated', False)
+    CELL_04 = Cell(PORTFOLIO_FTE_OTHER_COL_ID, 'fte_other', False)
+    CELL_05 = Cell(PORTFOLIO_FTE_Y1_COL_ID, 'fte_y1', False)
+    CELL_06 = Cell(PORTFOLIO_FTE_Y2_COL_ID, 'fte_y2', False)
+    CELL_07 = Cell(PORTFOLIO_FTE_Y3_COL_ID, 'fte_y3', False)
+    CELL_08 = Cell(PORTFOLIO_INCLUDE_COL_ID, 'include_in_model', True)
+    CELL_09 = Cell(PORTFOLIO_PROJ_CODE_COL_ID, 'project_code', True)
+    CELL_10 = Cell(PORTFOLIO_ANN_REV_COL_ID, 'annual_revenue', False)
+    CELL_11 = Cell(PORTFOLIO_GP_PRC_COL_ID, 'gross_profit_perc', False)
+    CELL_12 = Cell(PORTFOLIO_ATTR_PRC_COL_ID, 'attribution_perc', False)
+    CELL_13 = Cell(PORTFOLIO_IS_COST_COL_ID, 'is_cost', True)
+    CELL_14 = Cell(PORTFOLIO_FUNC_COL_ID, 'function', True)
+    CELL_15 = Cell(PORTFOLIO_DR_COL_ID, 'discount_rate', True)
+    CELL_16 = Cell(PORTFOLIO_START_AMT_COL_ID, 'start_value', True)
+    CELL_17 = Cell(PORTFOLIO_DELAY_PERIOD_COL_ID, 'delay_qtrs', True)
+    CELL_18 = Cell(PORTFOLIO_MAX_AMT_COL_ID, 'max_amt', True)
+    CELL_19 = Cell(PORTFOLIO_SCALE_PERIOD_COL_ID, 'scale_up_qtrs', True)
+    CELL_20 = Cell(PORTFOLIO_MAX_PLANTS_COL_ID, 'max_plants', False)
+    CELL_21 = Cell(PORTFOLIO_DG_COL_ID, 'digital_gallons', True)
+    CELL_22 = Cell(PORTFOLIO_COMMENTS_COL_ID, 'comments', False)
 
     def __init__(self, row):
         self.amt_unit_conversion = 10**6 # covert from millions to dollars
@@ -323,6 +397,7 @@ class PortfolioSheetRow(SmartsheetRow):
         super().__init__(row)
         
     def _discount_rate(self, val):
+        """By convention, discount rates are expressed in annualized terms. Convert to period"""
         return val / self.periods_in_year
         
     @staticmethod
@@ -358,40 +433,43 @@ class PortfolioSheetRow(SmartsheetRow):
 
 
 class PortfolioFTEParser(SmartsheetRow):
-    CELL_00 = Cell(0, 'name', True)
-    CELL_05 = Cell(5, 'fte_y1', True)
-    CELL_06 = Cell(6, 'fte_y2', True)
-    CELL_07 = Cell(7, 'fte_y3', True)
-    CELL_09 = Cell(9, 'project_code', True)
-    CELL_15 = Cell(15, 'discount_rate', True)
+    CELL_00 = Cell(PORTFOLIO_NAME_COL_ID, 'name', True)
+    CELL_05 = Cell(PORTFOLIO_FTE_Y1_COL_ID, 'fte_y1', True)
+    CELL_06 = Cell(PORTFOLIO_FTE_Y2_COL_ID, 'fte_y2', True)
+    CELL_07 = Cell(PORTFOLIO_FTE_Y3_COL_ID, 'fte_y3', True)
+    CELL_09 = Cell(PORTFOLIO_PROJ_CODE_COL_ID, 'project_code', True)
+    CELL_15 = Cell(PORTFOLIO_DR_COL_ID, 'discount_rate', True)
 
     def __init__(self, row, periods_in_year=4):
         self.amt_unit_conversion = 10**6 # covert from millions to dollars
         self.periods_in_year = periods_in_year
         super().__init__(row)
-        fte_year_to_period = lambda x: x / 4
-        self.fte_per_period = [fte_year_to_period(self.fte_y1) for _ in range(self.periods_in_year)] + \
-                          [fte_year_to_period(self.fte_y2) for _ in range(self.periods_in_year)] + \
-                          [fte_year_to_period(self.fte_y3) for _ in range(self.periods_in_year)]
+        self.fte_per_period = [self.fte_y1 for _ in range(self.periods_in_year)] + \
+                          [self.fte_y2 for _ in range(self.periods_in_year)] + \
+                          [self.fte_y3 for _ in range(self.periods_in_year)]
+        
+    def _discount_rate(self, val):
+        """By convention, discount rates are expressed in annualized terms. Convert to period"""
+        return val / self.periods_in_year
 
     def _fte_y1(self, val):
         return val * self.amt_unit_conversion
     
     def _fte_y2(self, val):
         return val * self.amt_unit_conversion
-    
+
     def _fte_y3(self, val):
         return val * self.amt_unit_conversion
 
-    
-def debug_row(row_num, sheet, cb=None):
-    """Very quickly see how the parser parses and outputs any single row"""
-    row = sheet.rows[row_num - 1]
-    print('--------------------------------------')
-    r = PortfolioFTEParser(row.to_dict())
-    print('--------------------------------------')
-    desc_list = [f'{i} - {cell}' for i, cell in enumerate(row.to_dict()['cells'])]
-    for line in desc_list:
-        print(line)
-    print('--------------------------------------')
-    return r
+
+def scan_global_vars(sheet, name, start_row, end_row):
+    for sheet_row in sheet.rows[start_row:end_row]:
+        cell_name = get_smartsheet_col_by_id(sheet_row, PORTFOLIO_NAME_COL_ID).get('value', None)
+        cell_value = get_smartsheet_col_by_id(
+            sheet_row,
+            PORTFOLIO_GLOB_VAR_VALUE_COL_ID
+        ).get('value', None)
+        if cell_name is not None and name.lower() == cell_name.lower():
+            return cell_value
+
+    raise Exception(f'Could not find a value for <{name}> in global vars from rows [{start_row}, {end_row}]')

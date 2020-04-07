@@ -3,3 +3,4 @@
 __pycache__/
 demo.xlsx
 data/
+.nz_portfolio_*.ipynb

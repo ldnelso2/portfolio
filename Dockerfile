@@ -15,6 +15,6 @@ EXPOSE 8866
 CMD voila \
     --no-browser \
     --VoilaConfiguration.file_whitelist="['.ico']" \
-    --template portfolio \
+    --template=portfolio \
     /tmp/nz_portfolio_dashboard.ipynb
 
