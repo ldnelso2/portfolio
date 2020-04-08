@@ -14,7 +14,7 @@ EXPOSE 8866
 # start voila process
 CMD voila \
     --no-browser \
-    --VoilaConfiguration.file_whitelist="['.ico']" \
+    --VoilaConfiguration.file_whitelist="['.ico', '.*\.(xlsx)']" \
     --template=portfolio \
     /tmp/nz_portfolio_dashboard.ipynb
 
