@@ -1,0 +1,11 @@
+version: '3.7'
+services:
+  portfolio:
+    build:
+        context: .
+    container_name: portfolio_app
+    image: portfolio
+    ports:
+      - 8866:8866
+    volumes:
+      - "./nz_portfolio_dashboard.ipynb:/app/nz_portfolio_dashboard.ipynb"
