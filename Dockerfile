@@ -17,9 +17,16 @@ COPY ./utils.py .
 EXPOSE 8866
 
 # start voila process
-CMD ["/usr/local/bin/voila", \
-    # "--VoilaConfiguration.file_whitelist=['.ico', '.*\.(xlsx)']", \
-    "--no-browser", \
-    "--debug", \
-    "--Voila.ip='0.0.0.0'", \
-    "nz_portfolio_dashboard.ipynb"]
+CMD /usr/local/bin/voila \
+    --no-browser \
+    --VoilaConfiguration.file_whitelist="['.ico', '.*\.(xlsx)']" \
+    --debug \
+    --template=portfolio \
+    nz_portfolio_dashboard.ipynb
+
+#CMD ["/usr/local/bin/voila", \
+#    "--no-browser", \
+#    "--VoilaConfiguration.file_whitelist=['.ico', '.*\.(xlsx)']", \
+#    "--debug", \
+#    "--Voila.ip='0.0.0.0'", \
+#    "nz_portfolio_dashboard.ipynb"]
