@@ -5,7 +5,7 @@ from collections import namedtuple
 #
 # Parsing immediately, and with intent of what must be there prevents
 # a slew of boundary type errors or runtime ones.
-Cell = namedtuple('Cell', ['col_id', 'name', 'required'])
+Cell = namedtuple('Cell', ['col_id', 'name'])
 
 
 # TODO: incorporate python traitlets for type checking
@@ -36,10 +36,14 @@ class SmartsheetRow():
     def _identity(x):
         return x
 
+    def is_required(self, cells_dict, cell_descriptor):
+        """Returns if cell is required or not. Defaults to all not required if not overriden"""
+        return False
+        
     def _get_cell(self, cell_descriptor):
         """Will try to grab the cell regardless, if it is required, an error will be logged"""
         try:
-            if cell_descriptor.required:
+            if self.is_required(self.cells_dct, cell_descriptor):
                 return self.cells_dct[cell_descriptor.col_id]['value']
             else:
                 return self.cells_dct[cell_descriptor.col_id].get('value', None)

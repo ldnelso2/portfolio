@@ -79,9 +79,11 @@ class CashFlow(CashFlowBase):
     """
     def __init__(self, delay_qtrs, digital_gallons, discount_rate, is_cost, max_amt, scale_up_qtrs,
                  function, vc_per_dg, start_amt=0, name='', flow_id=uuid.uuid4(), tot_qtrs=12):
-        if scale_up_qtrs < 2: 
+        # I don't like this, as this is typically something the parser should handle; however,
+        # we need to assert that scale_up_qtrs doesn't cause bad mathematical results
+        if function != 'step' and scale_up_qtrs < 2: 
             raise Exception('the total number of quarters must be at least one')
-
+            
         self.delay_qtrs = delay_qtrs
         self.digital_gallons = digital_gallons
         self.discount_rate = discount_rate / 4 # annual discount rate -> quarterly
@@ -367,35 +369,60 @@ class PortfolioSheetRow(SmartsheetRow):
        Any methods defined with the same "name" as the attribute preceeded by an underscore
        will apploy that function to the attribute as a clean way to modify the value if necessary.
     """
-    CELL_00 = Cell(PORTFOLIO_NAME_COL_ID, 'name', True)
-    CELL_01 = Cell(PORTFOLIO_SCENARIO_COL_ID, 'scenario', False)
-    CELL_02 = Cell(PORTFOLIO_FTE_TODAY_COL_ID, 'fte_today', False)
-    CELL_03 = Cell(PORTFOLIO_FTE_UNALLOC_COL_ID, 'fte_unallocated', False)
-    CELL_04 = Cell(PORTFOLIO_FTE_OTHER_COL_ID, 'fte_other', False)
-    CELL_05 = Cell(PORTFOLIO_FTE_Y1_COL_ID, 'fte_y1', False)
-    CELL_06 = Cell(PORTFOLIO_FTE_Y2_COL_ID, 'fte_y2', False)
-    CELL_07 = Cell(PORTFOLIO_FTE_Y3_COL_ID, 'fte_y3', False)
-    CELL_08 = Cell(PORTFOLIO_INCLUDE_COL_ID, 'include_in_model', True)
-    CELL_09 = Cell(PORTFOLIO_PROJ_CODE_COL_ID, 'project_code', True)
-    CELL_10 = Cell(PORTFOLIO_ANN_REV_COL_ID, 'annual_revenue', False)
-    CELL_11 = Cell(PORTFOLIO_GP_PRC_COL_ID, 'gross_profit_perc', False)
-    CELL_12 = Cell(PORTFOLIO_ATTR_PRC_COL_ID, 'attribution_perc', False)
-    CELL_13 = Cell(PORTFOLIO_IS_COST_COL_ID, 'is_cost', True)
-    CELL_14 = Cell(PORTFOLIO_FUNC_COL_ID, 'function', True)
-    CELL_15 = Cell(PORTFOLIO_DR_COL_ID, 'discount_rate', True)
-    CELL_16 = Cell(PORTFOLIO_START_AMT_COL_ID, 'start_value', True)
-    CELL_17 = Cell(PORTFOLIO_DELAY_PERIOD_COL_ID, 'delay_qtrs', True)
-    CELL_18 = Cell(PORTFOLIO_MAX_AMT_COL_ID, 'max_amt', True)
-    CELL_19 = Cell(PORTFOLIO_SCALE_PERIOD_COL_ID, 'scale_up_qtrs', True)
-    CELL_20 = Cell(PORTFOLIO_MAX_PLANTS_COL_ID, 'max_plants', False)
-    CELL_21 = Cell(PORTFOLIO_DG_COL_ID, 'digital_gallons', True)
-    CELL_22 = Cell(PORTFOLIO_COMMENTS_COL_ID, 'comments', False)
+    CELL_00 = Cell(PORTFOLIO_NAME_COL_ID, 'name')
+    CELL_01 = Cell(PORTFOLIO_SCENARIO_COL_ID, 'scenario')
+    CELL_02 = Cell(PORTFOLIO_FTE_TODAY_COL_ID, 'fte_today')
+    CELL_03 = Cell(PORTFOLIO_FTE_UNALLOC_COL_ID, 'fte_unallocated')
+    CELL_04 = Cell(PORTFOLIO_FTE_OTHER_COL_ID, 'fte_other')
+    CELL_05 = Cell(PORTFOLIO_FTE_Y1_COL_ID, 'fte_y1')
+    CELL_06 = Cell(PORTFOLIO_FTE_Y2_COL_ID, 'fte_y2')
+    CELL_07 = Cell(PORTFOLIO_FTE_Y3_COL_ID, 'fte_y3')
+    CELL_08 = Cell(PORTFOLIO_INCLUDE_COL_ID, 'include_in_model')
+    CELL_09 = Cell(PORTFOLIO_PROJ_CODE_COL_ID, 'project_code')
+    CELL_10 = Cell(PORTFOLIO_ANN_REV_COL_ID, 'annual_revenue')
+    CELL_11 = Cell(PORTFOLIO_GP_PRC_COL_ID, 'gross_profit_perc')
+    CELL_12 = Cell(PORTFOLIO_ATTR_PRC_COL_ID, 'attribution_perc')
+    CELL_13 = Cell(PORTFOLIO_IS_COST_COL_ID, 'is_cost')
+    CELL_14 = Cell(PORTFOLIO_FUNC_COL_ID, 'function')
+    CELL_15 = Cell(PORTFOLIO_DR_COL_ID, 'discount_rate')
+    CELL_16 = Cell(PORTFOLIO_START_AMT_COL_ID, 'start_value')
+    CELL_17 = Cell(PORTFOLIO_DELAY_PERIOD_COL_ID, 'delay_qtrs')
+    CELL_18 = Cell(PORTFOLIO_MAX_AMT_COL_ID, 'max_amt')
+    CELL_19 = Cell(PORTFOLIO_SCALE_PERIOD_COL_ID, 'scale_up_qtrs')
+    CELL_20 = Cell(PORTFOLIO_MAX_PLANTS_COL_ID, 'max_plants')
+    CELL_21 = Cell(PORTFOLIO_DG_COL_ID, 'digital_gallons')
+    CELL_22 = Cell(PORTFOLIO_COMMENTS_COL_ID, 'comments')
 
     def __init__(self, row):
         self.amt_unit_conversion = 10**6 # covert from millions to dollars
         self.periods_in_year = 4
         super().__init__(row)
-        
+
+    def is_required(self, cells_dict, cell_descriptor):
+        """Custom logic to determine if cells are filled out correctly in SmartSheet"""
+        # ensure at least function column is populated, we require it for logic
+        assert cells_dict[PORTFOLIO_FUNC_COL_ID].get('value', False)
+        always_required = [
+            'name',
+            'include_in_model',
+            'project_code',
+            'is_cost',
+            'function',
+            'discount_rate',
+            'start_value',
+            'delay_qtrs',
+            'max_amt',
+            'digital_gallons'
+        ]
+
+        function = self._function(cells_dict[PORTFOLIO_FUNC_COL_ID]['value'])
+        if cell_descriptor.name in always_required:
+            return True
+        elif cell_descriptor.name == 'scale_up_qtrs' and function != 'step':
+            return True
+        else:
+            return False
+
     def _discount_rate(self, val):
         """By convention, discount rates are expressed in annualized terms. Convert to period"""
         return val / self.periods_in_year
@@ -433,12 +460,12 @@ class PortfolioSheetRow(SmartsheetRow):
 
 
 class PortfolioFTEParser(SmartsheetRow):
-    CELL_00 = Cell(PORTFOLIO_NAME_COL_ID, 'name', True)
-    CELL_05 = Cell(PORTFOLIO_FTE_Y1_COL_ID, 'fte_y1', True)
-    CELL_06 = Cell(PORTFOLIO_FTE_Y2_COL_ID, 'fte_y2', True)
-    CELL_07 = Cell(PORTFOLIO_FTE_Y3_COL_ID, 'fte_y3', True)
-    CELL_09 = Cell(PORTFOLIO_PROJ_CODE_COL_ID, 'project_code', True)
-    CELL_15 = Cell(PORTFOLIO_DR_COL_ID, 'discount_rate', True)
+    CELL_00 = Cell(PORTFOLIO_NAME_COL_ID, 'name')
+    CELL_05 = Cell(PORTFOLIO_FTE_Y1_COL_ID, 'fte_y1')
+    CELL_06 = Cell(PORTFOLIO_FTE_Y2_COL_ID, 'fte_y2')
+    CELL_07 = Cell(PORTFOLIO_FTE_Y3_COL_ID, 'fte_y3')
+    CELL_09 = Cell(PORTFOLIO_PROJ_CODE_COL_ID, 'project_code')
+    CELL_15 = Cell(PORTFOLIO_DR_COL_ID, 'discount_rate')
 
     def __init__(self, row, periods_in_year=4):
         self.amt_unit_conversion = 10**6 # covert from millions to dollars
@@ -448,6 +475,12 @@ class PortfolioFTEParser(SmartsheetRow):
                           [self.fte_y2 for _ in range(self.periods_in_year)] + \
                           [self.fte_y3 for _ in range(self.periods_in_year)]
         
+    def is_required(self, cells_dict, cell_descriptor):
+        always_required = ['name', 'fte_y1', 'fte_y2', 'fte_y3', 'project_code', 'discount_rate']
+        if cell_descriptor.name in always_required:
+            return True
+        return False
+
     def _discount_rate(self, val):
         """By convention, discount rates are expressed in annualized terms. Convert to period"""
         return val / self.periods_in_year
