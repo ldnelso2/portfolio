@@ -83,7 +83,7 @@ class CashFlow(CashFlowBase):
         # we need to assert that scale_up_qtrs doesn't cause bad mathematical results
         if function != 'step' and scale_up_qtrs < 2: 
             raise Exception('the total number of quarters must be at least one')
-            
+
         self.delay_qtrs = delay_qtrs
         self.digital_gallons = digital_gallons
         self.discount_rate = discount_rate / 4 # annual discount rate -> quarterly
@@ -416,12 +416,11 @@ class PortfolioSheetRow(SmartsheetRow):
         ]
 
         function = self._function(cells_dict[PORTFOLIO_FUNC_COL_ID]['value'])
-        if cell_descriptor.name in always_required:
+        if cell_descriptor.name in always_required or \
+                cell_descriptor.name == 'scale_up_qtrs' and function != 'step':
             return True
-        elif cell_descriptor.name == 'scale_up_qtrs' and function != 'step':
-            return True
-        else:
-            return False
+
+        return False
 
     def _discount_rate(self, val):
         """By convention, discount rates are expressed in annualized terms. Convert to period"""
@@ -479,6 +478,7 @@ class PortfolioFTEParser(SmartsheetRow):
         always_required = ['name', 'fte_y1', 'fte_y2', 'fte_y3', 'project_code', 'discount_rate']
         if cell_descriptor.name in always_required:
             return True
+
         return False
 
     def _discount_rate(self, val):
